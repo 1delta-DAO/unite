@@ -39,7 +39,9 @@ contract ContractSignerTest is Test {
     function testValidSignature() public view {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, testHash);
 
-        bytes memory signature = abi.encodePacked(r, s, v, signerAddress);
+        bytes memory signature = abi.encode(
+            abi.encodePacked(r, s, v, signerAddress)
+        );
 
         console.log("Signature length:", signature.length);
 
