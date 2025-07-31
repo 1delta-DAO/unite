@@ -126,16 +126,4 @@ abstract contract Composer is
             _invalidOperation();
         }
     }
-
-    function _transfers(
-        uint256 currentOffset,
-        address callerAddress,
-        uint256 amount
-    ) internal returns (uint256) {}
-
-    function _permit(
-        uint256 currentOffset,
-        address callerAddress,
-        uint256 amount
-    ) internal returns (uint256) {}
 }

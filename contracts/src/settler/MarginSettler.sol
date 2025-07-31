@@ -4,22 +4,27 @@ pragma solidity 0.8.30;
 import {Address, AddressLib} from "@1inch/solidity-utils/contracts/libraries/AddressLib.sol";
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 import {UniERC20} from "@1inch/solidity-utils/contracts/libraries/UniERC20.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
-
 import {IOrderMixin} from "@1inch/lo/interfaces/IOrderMixin.sol";
 import {IPreInteraction} from "@1inch/lo/interfaces/IPreInteraction.sol";
 import {IPostInteraction} from "@1inch/lo/interfaces/IPostInteraction.sol";
 import {ITakerInteraction} from "@1inch/lo/interfaces/ITakerInteraction.sol";
 import {MakerTraits, MakerTraitsLib} from "@1inch/lo/libraries/MakerTraitsLib.sol";
 import {TakerTraits, TakerTraitsLib} from "@1inch/lo/libraries/TakerTraitsLib.sol";
+
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+
 import {ContractSigner} from "../signer/ContractSigner.sol";
-import "../Errors.sol";
+
 import {ComposerCommands} from "../composer/lib/enums/DeltaEnums.sol";
 import {Composer} from "../composer/Composer.sol";
 import {UniversalFlashLoan} from "../composer/flashLoan/UniversalFlashLoan.sol";
 import {ExternalCall} from "../composer/externalCall/ExternalCall.sol";
+import {Transfers} from "../composer/transfers/Transfers.sol";
+import {Permits} from "../composer/permit/Permits.sol";
+
+import "../Errors.sol";
 
 contract MarginSettler is
     IPostInteraction,
@@ -29,6 +34,8 @@ contract MarginSettler is
     Composer,
     UniversalFlashLoan,
     ExternalCall,
+    Transfers,
+    Permits,
     EIP712
 {
     using AddressLib for Address;
@@ -39,17 +46,12 @@ contract MarginSettler is
     using TakerTraitsLib for TakerTraits;
 
     address private immutable _LIMIT_ORDER_PROTOCOL;
-    address private immutable _WETH;
 
     string private constant _NAME = "1DeltaMarginSettler";
     string private constant _VERSION = "1";
 
-    constructor(
-        address limitOrderProtocol,
-        address weth
-    ) EIP712(_NAME, _VERSION) {
+    constructor(address limitOrderProtocol) EIP712(_NAME, _VERSION) {
         _LIMIT_ORDER_PROTOCOL = limitOrderProtocol;
-        _WETH = weth;
     }
 
     modifier onlyLimitOrderProtocol() {
@@ -110,11 +112,7 @@ contract MarginSettler is
                     depositAmount
                 );
             } else if (operation == ComposerCommands.PERMIT) {
-                currentOffset = _permit(
-                    currentOffset,
-                    callerAddress,
-                    depositAmount
-                );
+                currentOffset = _permit(currentOffset, callerAddress);
             } else if (operation == ComposerCommands.FLASH_LOAN) {
                 currentOffset = _universalFlashLoan(
                     currentOffset,
