@@ -14,7 +14,7 @@ abstract contract Composer is
     MorphoLending
 {
     function _lendingOperations(
-        address user,
+        address callerAddress,
         uint256 currentOffset,
         uint256 amount
     ) internal returns (uint256) {
@@ -79,7 +79,7 @@ abstract contract Composer is
          */
         else if (lendingOperation == LenderOps.WITHDRAW) {
             if (lender < LenderIds.UP_TO_AAVE_V2) {
-                return _withdrawFromAave(currentOffset, callerAddress);
+                return _withdrawFromAave(currentOffset, callerAddress, amount);
             } else if (lender < LenderIds.UP_TO_COMPOUND_V3) {
                 return _withdrawFromCompoundV3(currentOffset, callerAddress);
             } else if (lender < LenderIds.UP_TO_COMPOUND_V2) {

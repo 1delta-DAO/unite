@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {Address, AddressLib} from "@1inch/solidity-utils/libraries/AddressLib.sol";
-import {SafeERC20} from "@1inch/solidity-utils/libraries/SafeERC20.sol";
-import {UniERC20} from "@1inch/solidity-utils/libraries/UniERC20.sol";
+import {Address, AddressLib} from "@1inch/solidity-utils/contracts/libraries/AddressLib.sol";
+import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
+import {UniERC20} from "@1inch/solidity-utils/contracts/libraries/UniERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -12,6 +12,7 @@ import {IPreInteraction} from "@1inch/lo/interfaces/IPreInteraction.sol";
 import {IPostInteraction} from "@1inch/lo/interfaces/IPostInteraction.sol";
 import {ITakerInteraction} from "@1inch/lo/interfaces/ITakerInteraction.sol";
 import {MakerTraits, MakerTraitsLib} from "@1inch/lo/libraries/MakerTraitsLib.sol";
+import {TakerTraits} from "@1inch/lo/libraries/TakerTraitsLib.sol";
 import {ContractSigner} from "../signer/ContractSigner.sol";
 import "../Errors.sol";
 import {ComposerCommands} from "../composer/enums/DeltaEnums.sol";
@@ -55,12 +56,11 @@ contract MarginSettler is
         bytes calldata extraData
     ) external override onlyLimitOrderProtocol {
         address user = order.receiver.get();
-        uint256 amount = order.makingAmount.get();
-        _lendingParser(user, amount, extraData);
+        _lendingParser(user, makingAmount, extraData);
     }
 
     function _lendingParser(
-        address user,
+        address callerAddress,
         uint256 amount,
         bytes calldata lendingOps
     ) internal {

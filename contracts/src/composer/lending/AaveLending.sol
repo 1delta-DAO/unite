@@ -35,7 +35,6 @@ abstract contract AaveLending is ERC20Selectors, Masks {
             // receiver
             let receiver := shr(96, calldataload(add(currentOffset, 36)))
 
-            let amount := and(UINT120_MASK, amountData)
             // get aToken
             let collateralToken := shr(96, calldataload(add(currentOffset, 56)))
             // skip  to end

@@ -5,6 +5,8 @@ pragma solidity ^0.8.30;
 error InvalidSignature();
 error InvalidSignatureLength();
 error InvalidOperation();
+error OnlyLimitOrderProtocol();
+error InvalidCalldata();
 
 bytes4 constant INVALID_OPERATION = 0x398d4d32;
 
