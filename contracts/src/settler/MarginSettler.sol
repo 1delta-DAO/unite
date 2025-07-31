@@ -70,10 +70,10 @@ contract MarginSettler is
     ) external override onlyLimitOrderProtocol {
         address user = order.receiver.get();
         // The lending operations map taker and maker amount as makerAmount: inputAmount, takerAmount: outputAmount
-        _lendingParser(user, takingAmount, makingAmount, extraData);
+        _composer(user, takingAmount, makingAmount, extraData);
     }
 
-    function _lendingParser(
+    function _composer(
         address callerAddress,
         uint256 depositAmount,
         uint256 borrowAmount,
@@ -141,7 +141,9 @@ contract MarginSettler is
         uint256 remainingMakingAmount,
         bytes calldata extraData
     ) external override onlyLimitOrderProtocol {
-        // TODO
+        address user = order.receiver.get();
+        // The lending operations map taker and maker amount as makerAmount: inputAmount, takerAmount: outputAmount
+        _composer(user, takingAmount, makingAmount, extraData);
     }
 
     function postInteraction(
@@ -154,7 +156,9 @@ contract MarginSettler is
         uint256 remainingMakingAmount,
         bytes calldata extraData
     ) external override onlyLimitOrderProtocol {
-        // TODO
+        address user = order.receiver.get();
+        // The lending operations map taker and maker amount as makerAmount: inputAmount, takerAmount: outputAmount
+        _composer(user, takingAmount, makingAmount, extraData);
     }
 
     function takeOrder(
