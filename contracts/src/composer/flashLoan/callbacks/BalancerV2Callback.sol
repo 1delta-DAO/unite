@@ -4,12 +4,12 @@ pragma solidity 0.8.30;
 
 import {Slots} from "../../lib/slots/Slots.sol";
 import {Masks} from "../../lib/masks/Masks.sol";
-import {DeltaErrors} from "../../../Errors.sol";
+import "../../../Errors.sol";
 
 /**
  * Flash loaning through BalancerV2
  */
-contract BalancerV2FlashLoanCallback is Slots, Masks, DeltaErrors {
+contract BalancerV2FlashLoanCallback is Slots, Masks {
     // Balancer V2 vaults
     address private constant BALANCER_V2 =
         0xBA12222222228d8Ba445958a75a0704d566BF2C8;

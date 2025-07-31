@@ -9,7 +9,7 @@ import {BalancerV2FlashLoans} from "./BalancerV2.sol";
 
 import {FlashLoanCallbacks} from "./FlashLoanCallbacks.sol";
 import {FlashLoanIds} from "../lib/enums/DeltaEnums.sol";
-import {DeltaErrors} from "../../Errors.sol";
+import "../../Errors.sol";
 
 /**
  * @title Flash loan aggregator

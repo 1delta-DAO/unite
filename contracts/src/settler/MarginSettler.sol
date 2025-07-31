@@ -15,7 +15,7 @@ import {MakerTraits, MakerTraitsLib} from "@1inch/lo/libraries/MakerTraitsLib.so
 import {TakerTraits} from "@1inch/lo/libraries/TakerTraitsLib.sol";
 import {ContractSigner} from "../signer/ContractSigner.sol";
 import "../Errors.sol";
-import {ComposerCommands} from "../composer/enums/DeltaEnums.sol";
+import {ComposerCommands} from "../composer/lib/enums/DeltaEnums.sol";
 import {Composer} from "../composer/Composer.sol";
 
 contract MarginSettler is
@@ -93,10 +93,14 @@ contract MarginSettler is
                 currentOffset = _transfers(
                     currentOffset,
                     callerAddress,
-                    amount
+                    depositAmount
                 );
             } else if (operation == ComposerCommands.PERMIT) {
-                currentOffset = _permit(currentOffset, callerAddress, amount);
+                currentOffset = _permit(
+                    currentOffset,
+                    callerAddress,
+                    depositAmount
+                );
             } else {
                 _invalidOperation();
             }

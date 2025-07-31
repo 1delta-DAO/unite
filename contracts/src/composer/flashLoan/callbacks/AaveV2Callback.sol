@@ -3,12 +3,12 @@
 pragma solidity 0.8.30;
 
 import {Masks} from "../../lib/masks/Masks.sol";
-import {DeltaErrors} from "../../../Errors.sol";
+import "../../../Errors.sol";
 
 /**
  * @title Take an Aave V2 flash loan callback
  */
-contract AaveV2FlashLoanCallback is Masks, DeltaErrors {
+contract AaveV2FlashLoanCallback is Masks {
     // Aave v2s
     address private constant GRANARY =
         0x102442A3BA1e441043154Bc0B8A2e2FB5E0F94A7;

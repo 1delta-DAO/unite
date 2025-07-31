@@ -114,7 +114,7 @@ abstract contract CompoundV3Lending is ERC20Selectors, Masks {
 
             currentOffset := add(currentOffset, 60)
 
-            let amount := and(UINT120_MASK, amount)
+            amount := and(UINT120_MASK, amount)
 
             // selector withdrawFrom(address,address,address,uint256)
             mstore(

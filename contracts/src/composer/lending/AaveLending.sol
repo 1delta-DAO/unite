@@ -23,8 +23,7 @@ abstract contract AaveLending is ERC20Selectors, Masks {
     /// @notice Withdraw from lender lastgiven user address and lender Id
     function _withdrawFromAave(
         uint256 currentOffset,
-        address callerAddress,
-        uint256 amount
+        address callerAddress
     ) internal returns (uint256) {
         assembly {
             let ptr := mload(0x40)
@@ -35,6 +34,7 @@ abstract contract AaveLending is ERC20Selectors, Masks {
             // receiver
             let receiver := shr(96, calldataload(add(currentOffset, 36)))
 
+            let amount := and(UINT120_MASK, amountData)
             // get aToken
             let collateralToken := shr(96, calldataload(add(currentOffset, 56)))
             // skip  to end
@@ -139,7 +139,7 @@ abstract contract AaveLending is ERC20Selectors, Masks {
             // skip pool (end of data)
             currentOffset := add(currentOffset, 61)
 
-            let amount := and(UINT120_MASK, amount)
+            amount := and(UINT120_MASK, amount)
 
             let ptr := mload(0x40)
             switch mode
@@ -233,7 +233,7 @@ abstract contract AaveLending is ERC20Selectors, Masks {
             // skip pool (end of data)
             currentOffset := add(currentOffset, 60)
 
-            let amount := and(UINT120_MASK, amount)
+            amount := and(UINT120_MASK, amount)
             // zero is this balance
             if iszero(amount) {
                 // selector for balanceOf(address)

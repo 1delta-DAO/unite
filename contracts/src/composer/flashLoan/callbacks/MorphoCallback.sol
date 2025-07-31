@@ -3,12 +3,12 @@
 pragma solidity 0.8.30;
 
 import {Masks} from "../../lib/masks/Masks.sol";
-import {DeltaErrors} from "../../../Errors.sol";
+import "../../../Errors.sol";
 
 /**
  * @title All Morpho Blue flash callbacks
  */
-contract MorphoFlashLoanCallback is Masks, DeltaErrors {
+contract MorphoFlashLoanCallback is Masks {
     /// @dev Constant MorphoB address
     address private constant MORPHO_BLUE =
         0x6c247b1F6182318877311737BaC0844bAa518F5e;

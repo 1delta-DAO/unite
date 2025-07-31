@@ -135,7 +135,8 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
      */
     function _encodeMorphoDeposit(
         uint256 currentOffset,
-        address callerAddress
+        address callerAddress,
+        uint256 amount
     ) internal returns (uint256) {
         assembly {
             let ptrBase := mload(0x40)

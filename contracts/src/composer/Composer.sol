@@ -5,13 +5,15 @@ import {AaveLending} from "./lending/AaveLending.sol";
 import {CompoundV2Lending} from "./lending/CompoundV2Lending.sol";
 import {CompoundV3Lending} from "./lending/CompoundV3Lending.sol";
 import {MorphoLending} from "./lending/MorphoLending.sol";
+import {UniversalFlashLoan} from "./flashLoan/UniversalFlashLoan.sol";
 import "../Errors.sol";
 
 abstract contract Composer is
     AaveLending,
     CompoundV2Lending,
     CompoundV3Lending,
-    MorphoLending
+    MorphoLending,
+    UniversalFlashLoan
 {
     function _lendingOperations(
         address callerAddress,
@@ -93,7 +95,7 @@ abstract contract Composer is
          */
         else if (lendingOperation == LenderOps.WITHDRAW) {
             if (lender < LenderIds.UP_TO_AAVE_V2) {
-                return _withdrawFromAave(currentOffset, callerAddress, amount);
+                return _withdrawFromAave(currentOffset, callerAddress);
             } else if (lender < LenderIds.UP_TO_COMPOUND_V3) {
                 return _withdrawFromCompoundV3(currentOffset, callerAddress);
             } else if (lender < LenderIds.UP_TO_COMPOUND_V2) {

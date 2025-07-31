@@ -37,7 +37,7 @@ abstract contract CompoundV2Lending is ERC20Selectors, Masks {
 
             currentOffset := add(currentOffset, 60)
 
-            let amount := and(UINT120_MASK, amount)
+            amount := and(UINT120_MASK, amount)
 
             // selector for borrowBehlaf(address,uint256)
             mstore(

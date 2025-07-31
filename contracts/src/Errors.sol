@@ -7,8 +7,21 @@ error InvalidSignatureLength();
 error InvalidOperation();
 error OnlyLimitOrderProtocol();
 error InvalidCalldata();
+error InvalidCaller();
+error InvalidInitiator();
+error InvalidFlashLoan();
 
+// InvalidOperation()
 bytes4 constant INVALID_OPERATION = 0x398d4d32;
+
+// InvalidCaller()
+bytes4 constant INVALID_CALLER = 0x48f5c3ed;
+
+// InvalidInitiator()
+bytes4 constant INVALID_INITIATOR = 0xbfda1f28;
+
+// InvalidFlashLoan()
+bytes4 constant INVALID_FLASH_LOAN = 0xbafe1c53;
 
 function _invalidOperation() pure {
     assembly {
