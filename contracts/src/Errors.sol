@@ -10,6 +10,7 @@ error InvalidCalldata();
 error InvalidCaller();
 error InvalidInitiator();
 error InvalidFlashLoan();
+error InvalidExtensionLength();
 
 // InvalidOperation()
 bytes4 constant INVALID_OPERATION = 0x398d4d32;
