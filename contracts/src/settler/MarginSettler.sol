@@ -56,12 +56,13 @@ contract MarginSettler is
         bytes calldata extraData
     ) external override onlyLimitOrderProtocol {
         address user = order.receiver.get();
-        _lendingParser(user, makingAmount, extraData);
+        _lendingParser(user, makingAmount, takingAmount, extraData);
     }
 
     function _lendingParser(
         address callerAddress,
-        uint256 amount,
+        uint256 depositAmount,
+        uint256 borrowAmount,
         bytes calldata lendingOps
     ) internal {
         uint256 length;
@@ -85,7 +86,8 @@ contract MarginSettler is
                 currentOffset = _lendingOperations(
                     callerAddress,
                     currentOffset,
-                    amount
+                    depositAmount,
+                    borrowAmount
                 );
             } else if (operation == ComposerCommands.TRANSFERS) {
                 currentOffset = _transfers(

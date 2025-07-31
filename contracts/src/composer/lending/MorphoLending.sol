@@ -57,7 +57,8 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
      */
     function _morphoBorrow(
         uint256 currentOffset,
-        address callerAddress
+        address callerAddress,
+        uint256 amount
     ) internal returns (uint256) {
         assembly {
             // morpho should be the primary choice
@@ -239,15 +240,15 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
      * | 40     | 20             | MarketParams.oracle             |
      * | 60     | 20             | MarketParams.irm                |
      * | 80     | 16             | MarketParams.lltv               |
-     * | 96     | 16             | Amount (depositAm)              |
-     * | 112    | 20             | receiver                        |
-     * | 132    | 20             | morpho                          | <-- we allow all morphos (incl forks)
-     * | 152    | 2              | calldataLength                  |
-     * | 154    | calldataLength | calldata                        |
+     * | 96     | 20             | receiver                        |
+     * | 116    | 20             | morpho                          | <-- we allow all morphos (incl forks)
+     * | 136    | 2              | calldataLength                  |
+     * | 138    | calldataLength | calldata                        |
      */
     function _encodeMorphoDepositCollateral(
         uint256 currentOffset,
-        address callerAddress
+        address callerAddress,
+        uint256 amount
     ) internal returns (uint256) {
         assembly {
             // use two memory ranges
@@ -263,11 +264,13 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
             mstore(add(ptr, 36), token) // MarketParams.collateralToken
             mstore(add(ptr, 68), shr(96, calldataload(add(currentOffset, 40)))) // MarketParams.oracle
             mstore(add(ptr, 100), shr(96, calldataload(add(currentOffset, 60)))) // MarketParams.irm
-            let lltvAndAmount := calldataload(add(currentOffset, 80))
-            mstore(add(ptr, 132), shr(128, lltvAndAmount)) // MarketParams.lltv
+            mstore(
+                add(ptr, 132),
+                shr(128, calldataload(add(currentOffset, 80)))
+            ) // MarketParams.lltv
 
             // we ignore flags as this only allows assets
-            let amountToDeposit := and(UINT120_MASK, lltvAndAmount)
+            let amountToDeposit := and(UINT120_MASK, amount)
 
             /**
              * if the amount is zero, we assume that the contract balance is deposited

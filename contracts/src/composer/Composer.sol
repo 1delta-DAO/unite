@@ -16,7 +16,8 @@ abstract contract Composer is
     function _lendingOperations(
         address callerAddress,
         uint256 currentOffset,
-        uint256 amount
+        uint256 depositAmount,
+        uint256 borrowAmount
     ) internal returns (uint256) {
         uint256 lendingOperation;
         uint256 lender;
@@ -31,18 +32,19 @@ abstract contract Composer is
          */
         if (lendingOperation == LenderOps.DEPOSIT) {
             if (lender < LenderIds.UP_TO_AAVE_V3) {
-                return _depositToAaveV3(currentOffset);
+                return _depositToAaveV3(currentOffset, depositAmount);
             } else if (lender < LenderIds.UP_TO_AAVE_V2) {
-                return _depositToAaveV2(currentOffset);
+                return _depositToAaveV2(currentOffset, depositAmount);
             } else if (lender < LenderIds.UP_TO_COMPOUND_V3) {
-                return _depositToCompoundV3(currentOffset);
+                return _depositToCompoundV3(currentOffset, depositAmount);
             } else if (lender < LenderIds.UP_TO_COMPOUND_V2) {
-                return _depositToCompoundV2(currentOffset);
+                return _depositToCompoundV2(currentOffset, depositAmount);
             } else {
                 return
                     _encodeMorphoDepositCollateral(
                         currentOffset,
-                        callerAddress
+                        callerAddress,
+                        depositAmount
                     );
             }
         }
@@ -51,13 +53,25 @@ abstract contract Composer is
          */
         else if (lendingOperation == LenderOps.BORROW) {
             if (lender < LenderIds.UP_TO_AAVE_V2) {
-                return _borrowFromAave(currentOffset, callerAddress);
+                return
+                    _borrowFromAave(currentOffset, callerAddress, borrowAmount);
             } else if (lender < LenderIds.UP_TO_COMPOUND_V3) {
-                return _borrowFromCompoundV3(currentOffset, callerAddress);
+                return
+                    _borrowFromCompoundV3(
+                        currentOffset,
+                        callerAddress,
+                        borrowAmount
+                    );
             } else if (lender < LenderIds.UP_TO_COMPOUND_V2) {
-                return _borrowFromCompoundV2(currentOffset, callerAddress);
+                return
+                    _borrowFromCompoundV2(
+                        currentOffset,
+                        callerAddress,
+                        borrowAmount
+                    );
             } else {
-                return _morphoBorrow(currentOffset, callerAddress);
+                return
+                    _morphoBorrow(currentOffset, callerAddress, borrowAmount);
             }
         }
         /**

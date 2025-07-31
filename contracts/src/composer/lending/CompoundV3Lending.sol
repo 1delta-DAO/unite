@@ -101,7 +101,8 @@ abstract contract CompoundV3Lending is ERC20Selectors, Masks {
      */
     function _borrowFromCompoundV3(
         uint256 currentOffset,
-        address callerAddress
+        address callerAddress,
+        uint256 amount
     ) internal returns (uint256) {
         assembly {
             let ptr := mload(0x40)
@@ -140,25 +141,23 @@ abstract contract CompoundV3Lending is ERC20Selectors, Masks {
      * | Offset | Length (bytes) | Description                     |
      * |--------|----------------|---------------------------------|
      * | 0      | 20             | underlying                      |
-     * | 20     | 16             | amount                          |
-     * | 36     | 20             | receiver                        |
-     * | 76     | 20             | comet                           |
+     * | 20     | 20             | receiver                        |
+     * | 40     | 20             | comet                           |
      */
     /// @notice Withdraw from lender lastgiven user address and lender Id
     function _depositToCompoundV3(
-        uint256 currentOffset
+        uint256 currentOffset,
+        uint256 amount
     ) internal returns (uint256) {
         assembly {
             let underlying := shr(96, calldataload(currentOffset))
-            // offset for amount at lower bytes
-            let amountData := shr(128, calldataload(add(currentOffset, 20)))
             // receiver
-            let receiver := shr(96, calldataload(add(currentOffset, 36)))
+            let receiver := shr(96, calldataload(add(currentOffset, 20)))
             // get comet
-            let comet := shr(96, calldataload(add(currentOffset, 56)))
-            currentOffset := add(currentOffset, 76)
+            let comet := shr(96, calldataload(add(currentOffset, 40)))
+            currentOffset := add(currentOffset, 60)
 
-            let amount := and(UINT120_MASK, amountData)
+            amount := and(UINT120_MASK, amount)
             // zero is this balance
             if iszero(amount) {
                 // selector for balanceOf(address)

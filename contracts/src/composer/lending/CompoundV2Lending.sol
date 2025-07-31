@@ -24,7 +24,8 @@ abstract contract CompoundV2Lending is ERC20Selectors, Masks {
      */
     function _borrowFromCompoundV2(
         uint256 currentOffset,
-        address callerAddress
+        address callerAddress,
+        uint256 amount
     ) internal returns (uint256) {
         assembly {
             let ptr := mload(0x40)
@@ -282,30 +283,26 @@ abstract contract CompoundV2Lending is ERC20Selectors, Masks {
      * | Offset | Length (bytes) | Description                     |
      * |--------|----------------|---------------------------------|
      * | 0      | 20             | underlying                      |
-     * | 20     | 16             | amount                          |
-     * | 36     | 20             | receiver                        |
-     * | 76     | 20             | cToken                          |
+     * | 20     | 20             | receiver                        |
+     * | 40     | 20             | cToken                          |
      */
     /// @notice Withdraw from lender lastgiven user address and lender Id
     function _depositToCompoundV2(
-        uint256 currentOffset
+        uint256 currentOffset,
+        uint256 amount
     ) internal returns (uint256) {
         assembly {
             let underlying := shr(96, calldataload(currentOffset))
-            // offset for amount at lower bytes
-            let amountData := shr(128, calldataload(add(currentOffset, 20)))
             // receiver
-            let receiver := shr(96, calldataload(add(currentOffset, 36)))
+            let receiver := shr(96, calldataload(add(currentOffset, 20)))
             // get cToken
-            let cToken := shr(96, calldataload(add(currentOffset, 56)))
-            currentOffset := add(currentOffset, 76)
+            let cToken := shr(96, calldataload(add(currentOffset, 40)))
+            currentOffset := add(currentOffset, 60)
 
             switch underlying
             // case native
             case 0 {
-                let amount
-
-                amount := and(UINT120_MASK, amountData)
+                amount := and(UINT120_MASK, amount)
                 // zero is this balance
                 if iszero(amount) {
                     amount := selfbalance()
@@ -363,9 +360,7 @@ abstract contract CompoundV2Lending is ERC20Selectors, Masks {
             }
             // erc20 case
             default {
-                let amount
-
-                amount := and(UINT120_MASK, amountData)
+                amount := and(UINT120_MASK, amount)
                 // zero is this balance
                 if iszero(amount) {
                     // selector for balanceOf(address)
