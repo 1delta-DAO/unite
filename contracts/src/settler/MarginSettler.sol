@@ -12,10 +12,10 @@ import {IPreInteraction} from "@1inch/lo/interfaces/IPreInteraction.sol";
 import {IPostInteraction} from "@1inch/lo/interfaces/IPostInteraction.sol";
 import {ITakerInteraction} from "@1inch/lo/interfaces/ITakerInteraction.sol";
 import {MakerTraits, MakerTraitsLib} from "@1inch/lo/libraries/MakerTraitsLib.sol";
-import {ContractSigner} from "../ContractSigner.sol";
+import {ContractSigner} from "../signer/ContractSigner.sol";
 import "../Errors.sol";
-import {ComposerCommands} from "./enums/DeltaEnums.sol";
-import {Composer} from "../settler/Composer.sol";
+import {ComposerCommands} from "../composer/enums/DeltaEnums.sol";
+import {Composer} from "../composer/Composer.sol";
 
 contract MarginSettler is
     IPreInteraction,

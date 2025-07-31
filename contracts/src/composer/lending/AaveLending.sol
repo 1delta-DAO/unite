@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
-import {ERC20Selectors} from "../../shared/selectors/ERC20Selectors.sol";
-import {Masks} from "../../shared/masks/Masks.sol";
+import {ERC20Selectors} from "../lib/selectors/ERC20Selectors.sol";
+import {Masks} from "../lib/masks/Masks.sol";
 
 // solhint-disable max-line-length
 
@@ -21,7 +21,11 @@ abstract contract AaveLending is ERC20Selectors, Masks {
      * | 96     | 20             | pool                            |
      */
     /// @notice Withdraw from lender lastgiven user address and lender Id
-    function _withdrawFromAave(uint256 currentOffset, address callerAddress) internal returns (uint256) {
+    function _withdrawFromAave(
+        uint256 currentOffset,
+        address callerAddress,
+        uint256 amount
+    ) internal returns (uint256) {
         assembly {
             let ptr := mload(0x40)
             // Aave types need to trasfer collateral tokens
@@ -60,21 +64,28 @@ abstract contract AaveLending is ERC20Selectors, Masks {
             mstore(add(ptr, 0x24), address())
             mstore(add(ptr, 0x44), amount)
 
-            let success := call(gas(), collateralToken, 0x0, ptr, 0x64, 0x0, 0x20)
+            let success := call(
+                gas(),
+                collateralToken,
+                0x0,
+                ptr,
+                0x64,
+                0x0,
+                0x20
+            )
 
             let rdsize := returndatasize()
 
-            success :=
-                and(
-                    success, // call itself succeeded
-                    or(
-                        iszero(rdsize), // no return data, or
-                        and(
-                            gt(rdsize, 31), // at least 32 bytes
-                            eq(mload(0x0), 1) // starts with uint256(1)
-                        )
+            success := and(
+                success, // call itself succeeded
+                or(
+                    iszero(rdsize), // no return data, or
+                    and(
+                        gt(rdsize, 31), // at least 32 bytes
+                        eq(mload(0x0), 1) // starts with uint256(1)
                     )
                 )
+            )
 
             if iszero(success) {
                 returndatacopy(0x0, 0x0, rdsize)
@@ -82,7 +93,10 @@ abstract contract AaveLending is ERC20Selectors, Masks {
             }
 
             // selector withdraw(address,uint256,address)
-            mstore(ptr, 0x69328dec00000000000000000000000000000000000000000000000000000000)
+            mstore(
+                ptr,
+                0x69328dec00000000000000000000000000000000000000000000000000000000
+            )
             mstore(add(ptr, 0x04), underlying)
             mstore(add(ptr, 0x24), amount)
             mstore(add(ptr, 0x44), receiver)
@@ -109,7 +123,10 @@ abstract contract AaveLending is ERC20Selectors, Masks {
      * | 76     | 1              | mode                            |
      * | 77     | 20             | pool                            |
      */
-    function _borrowFromAave(uint256 currentOffset, address callerAddress) internal returns (uint256) {
+    function _borrowFromAave(
+        uint256 currentOffset,
+        address callerAddress
+    ) internal returns (uint256) {
         assembly {
             let underlying := shr(96, calldataload(currentOffset))
             // offset for amount at lower bytes
@@ -130,7 +147,10 @@ abstract contract AaveLending is ERC20Selectors, Masks {
             case 0 {
                 // borrowing with no irMode (special aave forks)
                 // selector borrow(address,uint256,uint16,address)
-                mstore(ptr, 0x1d5d723700000000000000000000000000000000000000000000000000000000)
+                mstore(
+                    ptr,
+                    0x1d5d723700000000000000000000000000000000000000000000000000000000
+                )
                 mstore(add(ptr, 0x04), underlying)
                 mstore(add(ptr, 0x24), amount)
                 mstore(add(ptr, 0x44), 0x0)
@@ -143,7 +163,10 @@ abstract contract AaveLending is ERC20Selectors, Masks {
             }
             default {
                 // selector borrow(address,uint256,uint256,uint16,address)
-                mstore(ptr, 0xa415bcad00000000000000000000000000000000000000000000000000000000)
+                mstore(
+                    ptr,
+                    0xa415bcad00000000000000000000000000000000000000000000000000000000
+                )
                 mstore(add(ptr, 0x04), underlying)
                 mstore(add(ptr, 0x24), amount)
                 mstore(add(ptr, 0x44), mode)
@@ -170,17 +193,16 @@ abstract contract AaveLending is ERC20Selectors, Masks {
                 // Check for ERC20 success. ERC20 tokens should return a boolean,
                 // but some don't. We accept 0-length return data as success, or at
                 // least 32 bytes that starts with a 32-byte boolean true.
-                success :=
-                    and(
-                        success, // call itself succeeded
-                        or(
-                            iszero(rdsize), // no return data, or
-                            and(
-                                gt(rdsize, 31), // at least 32 bytes
-                                eq(mload(ptr), 1) // starts with uint256(1)
-                            )
+                success := and(
+                    success, // call itself succeeded
+                    or(
+                        iszero(rdsize), // no return data, or
+                        and(
+                            gt(rdsize, 31), // at least 32 bytes
+                            eq(mload(ptr), 1) // starts with uint256(1)
                         )
                     )
+                )
 
                 if iszero(success) {
                     returndatacopy(0, 0, rdsize)
@@ -200,7 +222,9 @@ abstract contract AaveLending is ERC20Selectors, Masks {
      * | 76     | 20             | pool                            |
      */
     /// @notice Withdraw from lender lastgiven user address and lender Id
-    function _depositToAaveV3(uint256 currentOffset) internal returns (uint256) {
+    function _depositToAaveV3(
+        uint256 currentOffset
+    ) internal returns (uint256) {
         assembly {
             let underlying := shr(96, calldataload(currentOffset))
             // offset for amount at lower bytes
@@ -228,7 +252,10 @@ abstract contract AaveLending is ERC20Selectors, Masks {
             let ptr := mload(0x40)
 
             // selector supply(address,uint256,address,uint16)
-            mstore(ptr, 0x617ba03700000000000000000000000000000000000000000000000000000000)
+            mstore(
+                ptr,
+                0x617ba03700000000000000000000000000000000000000000000000000000000
+            )
             mstore(add(ptr, 0x04), underlying)
             mstore(add(ptr, 0x24), amount)
             mstore(add(ptr, 0x44), receiver)
@@ -251,7 +278,9 @@ abstract contract AaveLending is ERC20Selectors, Masks {
      * | 76     | 20             | pool                            |
      */
     /// @notice Withdraw from lender lastgiven user address and lender Id
-    function _depositToAaveV2(uint256 currentOffset) internal returns (uint256) {
+    function _depositToAaveV2(
+        uint256 currentOffset
+    ) internal returns (uint256) {
         assembly {
             let underlying := shr(96, calldataload(currentOffset))
             // offset for amount at lower bytes
@@ -287,7 +316,10 @@ abstract contract AaveLending is ERC20Selectors, Masks {
 
             let ptr := mload(0x40)
             // selector deposit(address,uint256,address,uint16)
-            mstore(ptr, 0xe8eda9df00000000000000000000000000000000000000000000000000000000)
+            mstore(
+                ptr,
+                0xe8eda9df00000000000000000000000000000000000000000000000000000000
+            )
             mstore(add(ptr, 0x04), underlying)
             mstore(add(ptr, 0x24), amount)
             mstore(add(ptr, 0x44), receiver)
@@ -311,7 +343,10 @@ abstract contract AaveLending is ERC20Selectors, Masks {
      * | 77     | 20             | debtToken                       |
      * | 97     | 20             | pool                            |
      */
-    function _repayToAave(uint256 currentOffset, address callerAddress) internal returns (uint256) {
+    function _repayToAave(
+        uint256 currentOffset,
+        address callerAddress
+    ) internal returns (uint256) {
         assembly {
             let underlying := shr(96, calldataload(currentOffset))
             // offset for amount at lower bytes
@@ -348,11 +383,22 @@ abstract contract AaveLending is ERC20Selectors, Masks {
                 // add caller address as parameter
                 mstore(0x04, callerAddress)
                 // call to debt token
-                pop(staticcall(gas(), shr(96, calldataload(add(currentOffset, 57))), 0x0, 0x24, 0x0, 0x20))
+                pop(
+                    staticcall(
+                        gas(),
+                        shr(96, calldataload(add(currentOffset, 57))),
+                        0x0,
+                        0x24,
+                        0x0,
+                        0x20
+                    )
+                )
                 // load the retrieved balance
                 let borrowBalance := mload(0x0)
                 // if borrow balance is less than the amount, select borrow balance
-                if lt(borrowBalance, amount) { amount := borrowBalance }
+                if lt(borrowBalance, amount) {
+                    amount := borrowBalance
+                }
             }
 
             // get pool
@@ -366,7 +412,10 @@ abstract contract AaveLending is ERC20Selectors, Masks {
             switch mode
             case 0 {
                 // selector repay(address,uint256,address)
-                mstore(ptr, 0x5ceae9c400000000000000000000000000000000000000000000000000000000)
+                mstore(
+                    ptr,
+                    0x5ceae9c400000000000000000000000000000000000000000000000000000000
+                )
                 mstore(add(ptr, 0x04), underlying)
                 mstore(add(ptr, 0x24), amount)
                 mstore(add(ptr, 0x44), receiver)
@@ -378,7 +427,10 @@ abstract contract AaveLending is ERC20Selectors, Masks {
             }
             default {
                 // selector repay(address,uint256,uint256,address)
-                mstore(ptr, 0x573ade8100000000000000000000000000000000000000000000000000000000)
+                mstore(
+                    ptr,
+                    0x573ade8100000000000000000000000000000000000000000000000000000000
+                )
                 mstore(add(ptr, 0x04), underlying)
                 mstore(add(ptr, 0x24), amount)
                 mstore(add(ptr, 0x44), mode)

@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
-import {ERC20Selectors} from "../../shared/selectors/ERC20Selectors.sol";
-import {Masks} from "../../shared/masks/Masks.sol";
+import {ERC20Selectors} from "../lib/selectors/ERC20Selectors.sol";
+import {Masks} from "../lib/masks/Masks.sol";
+
+// solhint-disable private-vars-leading-underscore
 
 /**
  * @notice Lending base contract that wraps Morpho Blue
@@ -13,25 +15,32 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
     // address internal constant MORPHO_BLUE = 0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb;
 
     /// @dev  position(...)
-    bytes32 private constant MORPHO_POSITION = 0x93c5206200000000000000000000000000000000000000000000000000000000;
+    bytes32 private constant MORPHO_POSITION =
+        0x93c5206200000000000000000000000000000000000000000000000000000000;
 
     /// @dev  market(...)
-    bytes32 private constant MORPHO_MARKET = 0x5c60e39a00000000000000000000000000000000000000000000000000000000;
+    bytes32 private constant MORPHO_MARKET =
+        0x5c60e39a00000000000000000000000000000000000000000000000000000000;
 
     /// @dev  repay(...)
-    bytes32 private constant MORPHO_REPAY = 0x20b76e8100000000000000000000000000000000000000000000000000000000;
+    bytes32 private constant MORPHO_REPAY =
+        0x20b76e8100000000000000000000000000000000000000000000000000000000;
 
     /// @dev  supplyCollateral(...)
-    bytes32 private constant MORPHO_SUPPLY_COLLATERAL = 0x238d657900000000000000000000000000000000000000000000000000000000;
+    bytes32 private constant MORPHO_SUPPLY_COLLATERAL =
+        0x238d657900000000000000000000000000000000000000000000000000000000;
 
     /// @dev  supply(...)
-    bytes32 private constant MORPHO_SUPPLY = 0xa99aad8900000000000000000000000000000000000000000000000000000000;
+    bytes32 private constant MORPHO_SUPPLY =
+        0xa99aad8900000000000000000000000000000000000000000000000000000000;
 
     /// @dev  borrow(...)
-    bytes32 private constant MORPHO_BORROW = 0x50d8cd4b00000000000000000000000000000000000000000000000000000000;
+    bytes32 private constant MORPHO_BORROW =
+        0x50d8cd4b00000000000000000000000000000000000000000000000000000000;
 
     /// @dev  withdrawCollateral(...)
-    bytes32 private constant MORPHO_WITHDRAW_COLLATERAL = 0x8720316d00000000000000000000000000000000000000000000000000000000;
+    bytes32 private constant MORPHO_WITHDRAW_COLLATERAL =
+        0x8720316d00000000000000000000000000000000000000000000000000000000;
 
     /**
      * | Offset | Length (bytes) | Description                     |
@@ -46,7 +55,10 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
      * | 112    | 20             | receiver                        |
      * | 132    | 20             | morpho                          | <-- we allow all morphos (incl forks)
      */
-    function _morphoBorrow(uint256 currentOffset, address callerAddress) internal returns (uint256) {
+    function _morphoBorrow(
+        uint256 currentOffset,
+        address callerAddress
+    ) internal returns (uint256) {
         assembly {
             // morpho should be the primary choice
             let ptr := mload(0x40)
@@ -121,7 +133,10 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
      * | 152    | 2              | calldataLength                  |
      * | 154    | calldataLength | calldata                        |
      */
-    function _encodeMorphoDeposit(uint256 currentOffset, address callerAddress) internal returns (uint256) {
+    function _encodeMorphoDeposit(
+        uint256 currentOffset,
+        address callerAddress
+    ) internal returns (uint256) {
         assembly {
             let ptrBase := mload(0x40)
             let ptr := add(128, ptrBase)
@@ -175,7 +190,10 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
             let morpho := shr(96, calldataload(add(currentOffset, 132)))
 
             // get calldatalength
-            let inputCalldataLength := and(UINT16_MASK, shr(240, calldataload(add(currentOffset, 152))))
+            let inputCalldataLength := and(
+                UINT16_MASK,
+                shr(240, calldataload(add(currentOffset, 152)))
+            )
             let calldataLength := inputCalldataLength
 
             currentOffset := add(currentOffset, 154)
@@ -227,7 +245,10 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
      * | 152    | 2              | calldataLength                  |
      * | 154    | calldataLength | calldata                        |
      */
-    function _encodeMorphoDepositCollateral(uint256 currentOffset, address callerAddress) internal returns (uint256) {
+    function _encodeMorphoDepositCollateral(
+        uint256 currentOffset,
+        address callerAddress
+    ) internal returns (uint256) {
         assembly {
             // use two memory ranges
             let ptrBase := mload(0x40)
@@ -273,7 +294,10 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
             let morpho := shr(96, calldataload(add(currentOffset, 132)))
 
             // get calldatalength
-            let inputCalldataLength := and(UINT16_MASK, shr(240, calldataload(add(currentOffset, 152))))
+            let inputCalldataLength := and(
+                UINT16_MASK,
+                shr(240, calldataload(add(currentOffset, 152)))
+            )
             let calldataLength := inputCalldataLength
             currentOffset := add(currentOffset, 154)
 
@@ -306,7 +330,10 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
     }
 
     /// @notice Withdraw collateral from Morpho Blue
-    function _encodeMorphoWithdrawCollateral(uint256 currentOffset, address callerAddress) internal returns (uint256) {
+    function _encodeMorphoWithdrawCollateral(
+        uint256 currentOffset,
+        address callerAddress
+    ) internal returns (uint256) {
         assembly {
             // morpho should be the primary choice
             let ptr := mload(0x40)
@@ -328,7 +355,10 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
             mstore(add(ptr, 196), callerAddress) // onBehalfOf
 
             // store receiver
-            mstore(add(ptr, 228), shr(96, calldataload(add(currentOffset, 112)))) // receiver
+            mstore(
+                add(ptr, 228),
+                shr(96, calldataload(add(currentOffset, 112)))
+            ) // receiver
             // skip receiver in offset
 
             let morpho := shr(96, calldataload(add(currentOffset, 132)))
@@ -345,7 +375,11 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
                 mstore(ptrBase, MORPHO_POSITION)
                 mstore(add(ptrBase, 0x4), marketId)
                 mstore(add(ptrBase, 0x24), callerAddress)
-                if iszero(staticcall(gas(), morpho, ptrBase, 0x44, ptrBase, 0x60)) { revert(0x0, 0x0) }
+                if iszero(
+                    staticcall(gas(), morpho, ptrBase, 0x44, ptrBase, 0x60)
+                ) {
+                    revert(0x0, 0x0)
+                }
                 lltvAndAmount := mload(add(ptrBase, 0x40))
             }
 
@@ -374,7 +408,10 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
     }
 
     /// @notice Withdraw borrowAsset from Morpho
-    function _encodeMorphoWithdraw(uint256 currentOffset, address callerAddress) internal returns (uint256) {
+    function _encodeMorphoWithdraw(
+        uint256 currentOffset,
+        address callerAddress
+    ) internal returns (uint256) {
         assembly {
             // morpho should be the primary choice
             let ptrBase := mload(0x40)
@@ -391,7 +428,10 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
             let withdrawAm := and(UINT120_MASK, lltvAndAmount)
 
             mstore(add(ptr, 228), callerAddress) // onBehalfOf
-            mstore(add(ptr, 260), shr(96, calldataload(add(currentOffset, 112)))) // receiver
+            mstore(
+                add(ptr, 260),
+                shr(96, calldataload(add(currentOffset, 112)))
+            ) // receiver
             // get morpho
             let morpho := shr(96, calldataload(add(currentOffset, 132)))
             currentOffset := add(currentOffset, 152)
@@ -419,7 +459,11 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
                     mstore(ptrBase, MORPHO_POSITION)
                     mstore(add(ptrBase, 0x4), marketId)
                     mstore(add(ptrBase, 0x24), callerAddress)
-                    if iszero(staticcall(gas(), morpho, ptrBase, 0x44, ptrBase, 0x20)) { revert(0x0, 0x0) }
+                    if iszero(
+                        staticcall(gas(), morpho, ptrBase, 0x44, ptrBase, 0x20)
+                    ) {
+                        revert(0x0, 0x0)
+                    }
                     mstore(add(ptr, 164), 0) // assets
                     mstore(add(ptr, 196), mload(ptrBase)) // shares
                 }
@@ -500,7 +544,9 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
                 // get the contract balance
                 mstore(0x0, ERC20_BALANCE_OF)
                 mstore(0x04, address())
-                if iszero(staticcall(gas(), token, 0x0, 0x24, 0x0, 0x20)) { revert(0x0, 0x0) }
+                if iszero(staticcall(gas(), token, 0x0, 0x24, 0x0, 0x20)) {
+                    revert(0x0, 0x0)
+                }
                 // this is the maximum we can repay
                 repayAm := mload(0x0)
 
@@ -511,13 +557,17 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
                 // accrue interest
                 // add accrueInterest (0x151c1ade)
                 mstore(sub(ptr, 28), 0x151c1ade)
-                if iszero(call(gas(), morpho, 0x0, ptr, 0xA4, 0x0, 0x0)) { revert(0x0, 0x0) }
+                if iszero(call(gas(), morpho, 0x0, ptr, 0xA4, 0x0, 0x0)) {
+                    revert(0x0, 0x0)
+                }
 
                 // get market params for conversion
                 let marketId := keccak256(add(ptr, 4), 160)
                 mstore(0x0, MORPHO_MARKET)
                 mstore(0x4, marketId)
-                if iszero(staticcall(gas(), morpho, 0x0, 0x24, ptrBase, 0x80)) { revert(0x0, 0x0) }
+                if iszero(staticcall(gas(), morpho, 0x0, 0x24, ptrBase, 0x80)) {
+                    revert(0x0, 0x0)
+                }
                 let totalBorrowAssets := mload(add(ptrBase, 0x40))
                 let totalBorrowShares := mload(add(ptrBase, 0x60))
 
@@ -525,19 +575,22 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
                 mstore(ptrBase, MORPHO_POSITION)
                 mstore(add(ptrBase, 0x4), marketId)
                 mstore(add(ptrBase, 0x24), receiver)
-                if iszero(staticcall(gas(), morpho, ptrBase, 0x44, ptrBase, 0x40)) { revert(0x0, 0x0) }
+                if iszero(
+                    staticcall(gas(), morpho, ptrBase, 0x44, ptrBase, 0x40)
+                ) {
+                    revert(0x0, 0x0)
+                }
                 let userBorrowShares := mload(add(ptrBase, 0x20))
 
                 // mulDivUp(shares, totalAssets + VIRTUAL_ASSETS, totalShares + VIRTUAL_SHARES);
                 let maxAssets := add(totalBorrowShares, 1000000) // VIRTUAL_SHARES=1e6
-                maxAssets :=
-                    div(
-                        add(
-                            mul(userBorrowShares, add(totalBorrowAssets, 1)), // VIRTUAL_ASSETS=1
-                            sub(maxAssets, 1) //
-                        ),
-                        maxAssets //
-                    )
+                maxAssets := div(
+                    add(
+                        mul(userBorrowShares, add(totalBorrowAssets, 1)), // VIRTUAL_ASSETS=1
+                        sub(maxAssets, 1) //
+                    ),
+                    maxAssets //
+                )
 
                 // if maxAssets is greater than repay amount
                 // we repay whatever is possible
@@ -557,7 +610,9 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
                 // get balance
                 mstore(0x0, ERC20_BALANCE_OF)
                 mstore(0x04, address())
-                if iszero(staticcall(gas(), token, 0x0, 0x24, 0x0, 0x20)) { revert(0x0, 0x0) }
+                if iszero(staticcall(gas(), token, 0x0, 0x24, 0x0, 0x20)) {
+                    revert(0x0, 0x0)
+                }
 
                 // use balance by assets
                 mstore(add(ptr, 164), mload(0x0)) // assets
@@ -582,7 +637,10 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
             mstore(add(ptr, 260), 0x120) // offset
 
             // get calldatalength
-            let inputCalldataLength := and(UINT16_MASK, shr(240, calldataload(add(currentOffset, 152))))
+            let inputCalldataLength := and(
+                UINT16_MASK,
+                shr(240, calldataload(add(currentOffset, 152)))
+            )
             let calldataLength := inputCalldataLength
             currentOffset := add(currentOffset, 154)
 

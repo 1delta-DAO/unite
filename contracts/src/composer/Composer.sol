@@ -1,7 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
+import "../Errors.sol";
+import {LenderOps, LenderIds} from "./enums/DeltaEnums.sol";
+import {AaveLending} from "./lending/AaveLending.sol";
+import {CompoundV2Lending} from "./lending/CompoundV2Lending.sol";
+import {CompoundV3Lending} from "./lending/CompoundV3Lending.sol";
+import {MorphoLending} from "./lending/MorphoLending.sol";
 
-abstract contract Composer {
+abstract contract Composer is
+    AaveLending,
+    CompoundV2Lending,
+    CompoundV3Lending,
+    MorphoLending
+{
     function _lendingOperations(
         address user,
         uint256 currentOffset,

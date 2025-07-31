@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
-import {ERC20Selectors} from "../../shared/selectors/ERC20Selectors.sol";
-import {Masks} from "../../shared/masks/Masks.sol";
+import {ERC20Selectors} from "../lib/selectors/ERC20Selectors.sol";
+import {Masks} from "../lib/masks/Masks.sol";
 
 // solhint-disable max-line-length
 
@@ -20,7 +20,10 @@ abstract contract CompoundV3Lending is ERC20Selectors, Masks {
      * | 76     | 1              | isBase                          |
      * | 77     | 20             | pool                            |
      */
-    function _withdrawFromCompoundV3(uint256 currentOffset, address callerAddress) internal returns (uint256) {
+    function _withdrawFromCompoundV3(
+        uint256 currentOffset,
+        address callerAddress
+    ) internal returns (uint256) {
         assembly {
             let ptr := mload(0x40)
             // Compound V3 types need to trasfer collateral tokens
@@ -44,7 +47,10 @@ abstract contract CompoundV3Lending is ERC20Selectors, Masks {
                 switch and(UINT8_MASK, shr(88, isBase))
                 case 0 {
                     // selector for userCollateral(address,address)
-                    mstore(ptr, 0x2b92a07d00000000000000000000000000000000000000000000000000000000)
+                    mstore(
+                        ptr,
+                        0x2b92a07d00000000000000000000000000000000000000000000000000000000
+                    )
                     // add caller address as parameter
                     mstore(add(ptr, 0x04), callerAddress)
                     // add underlying address
@@ -68,7 +74,10 @@ abstract contract CompoundV3Lending is ERC20Selectors, Masks {
             }
 
             // selector withdrawFrom(address,address,address,uint256)
-            mstore(ptr, 0x2644131800000000000000000000000000000000000000000000000000000000)
+            mstore(
+                ptr,
+                0x2644131800000000000000000000000000000000000000000000000000000000
+            )
             mstore(add(ptr, 0x04), callerAddress)
             mstore(add(ptr, 0x24), receiver)
             mstore(add(ptr, 0x44), underlying)
@@ -90,7 +99,10 @@ abstract contract CompoundV3Lending is ERC20Selectors, Masks {
      * | 36     | 20             | receiver                        |
      * | 76     | 20             | comet                           |
      */
-    function _borrowFromCompoundV3(uint256 currentOffset, address callerAddress) internal returns (uint256) {
+    function _borrowFromCompoundV3(
+        uint256 currentOffset,
+        address callerAddress
+    ) internal returns (uint256) {
         assembly {
             let ptr := mload(0x40)
             // Compound V3 types need to trasfer collateral tokens
@@ -107,7 +119,10 @@ abstract contract CompoundV3Lending is ERC20Selectors, Masks {
             let amount := and(UINT120_MASK, amountData)
 
             // selector withdrawFrom(address,address,address,uint256)
-            mstore(ptr, 0x2644131800000000000000000000000000000000000000000000000000000000)
+            mstore(
+                ptr,
+                0x2644131800000000000000000000000000000000000000000000000000000000
+            )
             mstore(add(ptr, 0x04), callerAddress)
             mstore(add(ptr, 0x24), receiver)
             mstore(add(ptr, 0x44), underlying)
@@ -130,7 +145,9 @@ abstract contract CompoundV3Lending is ERC20Selectors, Masks {
      * | 76     | 20             | comet                           |
      */
     /// @notice Withdraw from lender lastgiven user address and lender Id
-    function _depositToCompoundV3(uint256 currentOffset) internal returns (uint256) {
+    function _depositToCompoundV3(
+        uint256 currentOffset
+    ) internal returns (uint256) {
         assembly {
             let underlying := shr(96, calldataload(currentOffset))
             // offset for amount at lower bytes
@@ -157,7 +174,10 @@ abstract contract CompoundV3Lending is ERC20Selectors, Masks {
             let ptr := mload(0x40)
 
             // selector supplyTo(address,address,uint256)
-            mstore(ptr, 0x4232cd6300000000000000000000000000000000000000000000000000000000)
+            mstore(
+                ptr,
+                0x4232cd6300000000000000000000000000000000000000000000000000000000
+            )
             mstore(add(ptr, 0x04), receiver)
             mstore(add(ptr, 0x24), underlying)
             mstore(add(ptr, 0x44), amount)
@@ -178,7 +198,9 @@ abstract contract CompoundV3Lending is ERC20Selectors, Masks {
      * | 36     | 20             | receiver                        |
      * | 76     | 20             | comet                           |
      */
-    function _repayToCompoundV3(uint256 currentOffset) internal returns (uint256) {
+    function _repayToCompoundV3(
+        uint256 currentOffset
+    ) internal returns (uint256) {
         assembly {
             let underlying := shr(96, calldataload(currentOffset))
             // offset for amount at lower bytes
@@ -216,7 +238,10 @@ abstract contract CompoundV3Lending is ERC20Selectors, Masks {
                 amount := mload(0x0)
 
                 // selector for borrowBalanceOf(address)
-                mstore(0, 0x374c49b400000000000000000000000000000000000000000000000000000000)
+                mstore(
+                    0,
+                    0x374c49b400000000000000000000000000000000000000000000000000000000
+                )
                 // add receiver as parameter
                 mstore(0x04, receiver)
                 // call to comet
@@ -225,12 +250,17 @@ abstract contract CompoundV3Lending is ERC20Selectors, Masks {
 
                 // amount greater than borrow balance -> use borrow balance
                 // otherwise repay less than the borrow balance safely
-                if gt(amount, userBorrowBalance) { amount := userBorrowBalance }
+                if gt(amount, userBorrowBalance) {
+                    amount := userBorrowBalance
+                }
             }
 
             let ptr := mload(0x40)
             // selector supplyTo(address,address,uint256)
-            mstore(ptr, 0x4232cd6300000000000000000000000000000000000000000000000000000000)
+            mstore(
+                ptr,
+                0x4232cd6300000000000000000000000000000000000000000000000000000000
+            )
             mstore(add(ptr, 0x04), receiver)
             mstore(add(ptr, 0x24), underlying)
             mstore(add(ptr, 0x44), amount)

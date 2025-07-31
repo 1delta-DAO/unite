@@ -3,7 +3,7 @@ pragma solidity ^0.8.30;
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 
-import "./Errors.sol";
+import "../Errors.sol";
 
 abstract contract ContractSigner is IERC1271 {
     function isValidSignature(
