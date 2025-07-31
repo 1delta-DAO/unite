@@ -19,6 +19,7 @@ import "../Errors.sol";
 import {ComposerCommands} from "../composer/lib/enums/DeltaEnums.sol";
 import {Composer} from "../composer/Composer.sol";
 import {UniversalFlashLoan} from "../composer/flashLoan/UniversalFlashLoan.sol";
+import {ExternalCall} from "../composer/externalCall/ExternalCall.sol";
 
 contract MarginSettler is
     IPostInteraction,
@@ -27,6 +28,7 @@ contract MarginSettler is
     ContractSigner,
     Composer,
     UniversalFlashLoan,
+    ExternalCall,
     EIP712
 {
     using AddressLib for Address;
@@ -67,7 +69,8 @@ contract MarginSettler is
         bytes calldata extraData
     ) external override onlyLimitOrderProtocol {
         address user = order.receiver.get();
-        _lendingParser(user, makingAmount, takingAmount, extraData);
+        // The lending operations map taker and maker amount as makerAmount: inputAmount, takerAmount: outputAmount
+        _lendingParser(user, takingAmount, makingAmount, extraData);
     }
 
     function _lendingParser(
