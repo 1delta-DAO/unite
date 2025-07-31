@@ -110,7 +110,12 @@ abstract contract Composer is
          * deposit lendingToken
          */
         else if (lendingOperation == LenderOps.DEPOSIT_LENDING_TOKEN) {
-            return _encodeMorphoDeposit(currentOffset, callerAddress);
+            return
+                _encodeMorphoDeposit(
+                    currentOffset,
+                    callerAddress,
+                    depositAmount
+                );
         }
         /**
          * withdraw lendingToken

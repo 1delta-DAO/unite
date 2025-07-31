@@ -128,11 +128,10 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
      * | 60     | 20             | MarketParams.irm                |
      * | 80     | 16             | MarketParams.lltv               |
      * | 96     |  1             | Assets or Shares                |
-     * | 97     | 15             | Amount (depositAm)              |
-     * | 112    | 20             | receiver                        |
-     * | 132    | 20             | morpho                          | <-- we allow all morphos (incl forks)
-     * | 152    | 2              | calldataLength                  |
-     * | 154    | calldataLength | calldata                        |
+     * | 97     | 20             | receiver                        |
+     * | 117    | 20             | morpho                          | <-- we allow all morphos (incl forks)
+     * | 137    | 2              | calldataLength                  |
+     * | 139    | calldataLength | calldata                        |
      */
     function _encodeMorphoDeposit(
         uint256 currentOffset,
@@ -152,16 +151,15 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
             mstore(add(ptr, 36), shr(96, calldataload(add(currentOffset, 20)))) // MarketParams.collateralToken
             mstore(add(ptr, 68), shr(96, calldataload(add(currentOffset, 40)))) // MarketParams.oracle
             mstore(add(ptr, 100), shr(96, calldataload(add(currentOffset, 60)))) // MarketParams.irm
-
-            let lltvAndAmount := calldataload(add(currentOffset, 80))
-            mstore(add(ptr, 132), shr(128, lltvAndAmount)) // MarketParams.lltv
-            let amountToDeposit := and(UINT112_MASK, lltvAndAmount)
+            let lltvAndShares := calldataload(add(currentOffset, 80))
+            mstore(add(ptr, 132), shr(128, lltvAndShares)) // MarketParams.lltv
+            let amountToDeposit := amount
             // increment for the amounts
 
             /**
              * check if it is by shares or assets
              */
-            switch and(USE_SHARES_FLAG, lltvAndAmount)
+            switch and(USE_SHARES_FLAG, amount)
             case 0 {
                 /**
                  * if the amount is zero, we assume that the contract balance is deposited
@@ -186,18 +184,18 @@ abstract contract MorphoLending is ERC20Selectors, Masks {
             }
 
             // receiver address
-            let receiver := shr(96, calldataload(add(currentOffset, 112)))
+            let receiver := shr(96, calldataload(add(currentOffset, 97)))
 
-            let morpho := shr(96, calldataload(add(currentOffset, 132)))
+            let morpho := shr(96, calldataload(add(currentOffset, 117)))
 
             // get calldatalength
             let inputCalldataLength := and(
                 UINT16_MASK,
-                shr(240, calldataload(add(currentOffset, 152)))
+                shr(240, calldataload(add(currentOffset, 137)))
             )
             let calldataLength := inputCalldataLength
 
-            currentOffset := add(currentOffset, 154)
+            currentOffset := add(currentOffset, 139)
 
             // leftover params
             mstore(add(ptr, 228), receiver) // onBehalfOf is the receiver here
