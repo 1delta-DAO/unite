@@ -18,9 +18,8 @@ abstract contract CompoundV2Lending is ERC20Selectors, Masks {
      * | Offset | Length (bytes) | Description                     |
      * |--------|----------------|---------------------------------|
      * | 0      | 20             | underlying                      |
-     * | 20     | 16             | amount                          |
-     * | 36     | 20             | receiver                        |
-     * | 76     | 20             | cToken                          |
+     * | 20     | 20             | receiver                        |
+     * | 40     | 20             | cToken                          |
      */
     function _borrowFromCompoundV2(
         uint256 currentOffset,
@@ -31,16 +30,14 @@ abstract contract CompoundV2Lending is ERC20Selectors, Masks {
             let ptr := mload(0x40)
             // Compound V3 types need to trasfer collateral tokens
             let underlying := shr(96, calldataload(currentOffset))
-            // offset for amount at lower bytes
-            let amountData := shr(128, calldataload(add(currentOffset, 20)))
             // receiver
-            let receiver := shr(96, calldataload(add(currentOffset, 36)))
+            let receiver := shr(96, calldataload(add(currentOffset, 20)))
 
-            let cToken := shr(96, calldataload(add(currentOffset, 56)))
+            let cToken := shr(96, calldataload(add(currentOffset, 40)))
 
-            currentOffset := add(currentOffset, 76)
+            currentOffset := add(currentOffset, 60)
 
-            let amount := and(UINT120_MASK, amountData)
+            let amount := and(UINT120_MASK, amount)
 
             // selector for borrowBehlaf(address,uint256)
             mstore(

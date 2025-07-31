@@ -117,10 +117,9 @@ abstract contract AaveLending is ERC20Selectors, Masks {
      * | Offset | Length (bytes) | Description                     |
      * |--------|----------------|---------------------------------|
      * | 0      | 20             | underlying                      |
-     * | 20     | 16             | amount                          |
-     * | 36     | 20             | receiver                        |
-     * | 76     | 1              | mode                            |
-     * | 77     | 20             | pool                            |
+     * | 20     | 20             | receiver                        |
+     * | 40     | 1              | mode                            |
+     * | 41     | 20             | pool                            |
      */
     function _borrowFromAave(
         uint256 currentOffset,
@@ -129,18 +128,18 @@ abstract contract AaveLending is ERC20Selectors, Masks {
     ) internal returns (uint256) {
         assembly {
             let underlying := shr(96, calldataload(currentOffset))
-            // offset for amount at lower bytes
-            let amountData := shr(128, calldataload(add(currentOffset, 20)))
-            let receiverAndMode := calldataload(add(currentOffset, 36))
             // receiver
-            let receiver := shr(96, receiverAndMode)
-            let mode := and(UINT8_MASK, shr(88, receiverAndMode))
+            let receiver := shr(96, calldataload(add(currentOffset, 20)))
+            let mode := and(
+                UINT8_MASK,
+                shr(88, calldataload(add(currentOffset, 40)))
+            )
             // get pool
-            let pool := shr(96, calldataload(add(currentOffset, 57)))
+            let pool := shr(96, calldataload(add(currentOffset, 41)))
             // skip pool (end of data)
-            currentOffset := add(currentOffset, 77)
+            currentOffset := add(currentOffset, 61)
 
-            let amount := and(UINT120_MASK, amountData)
+            let amount := and(UINT120_MASK, amount)
 
             let ptr := mload(0x40)
             switch mode
