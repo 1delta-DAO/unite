@@ -5,15 +5,13 @@ import {AaveLending} from "./lending/AaveLending.sol";
 import {CompoundV2Lending} from "./lending/CompoundV2Lending.sol";
 import {CompoundV3Lending} from "./lending/CompoundV3Lending.sol";
 import {MorphoLending} from "./lending/MorphoLending.sol";
-import {UniversalFlashLoan} from "./flashLoan/UniversalFlashLoan.sol";
 import "../Errors.sol";
 
 abstract contract Composer is
     AaveLending,
     CompoundV2Lending,
     CompoundV3Lending,
-    MorphoLending,
-    UniversalFlashLoan
+    MorphoLending
 {
     function _lendingOperations(
         address callerAddress,

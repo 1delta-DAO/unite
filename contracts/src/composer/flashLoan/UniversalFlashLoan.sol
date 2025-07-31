@@ -27,7 +27,8 @@ contract UniversalFlashLoan is
      */
     function _universalFlashLoan(
         uint256 currentOffset,
-        address callerAddress
+        address callerAddress,
+        uint256 amount
     ) internal virtual returns (uint256) {
         uint256 flashLoanType; // architecture type
         assembly {
@@ -36,13 +37,13 @@ contract UniversalFlashLoan is
         }
 
         if (flashLoanType == FlashLoanIds.MORPHO) {
-            return morphoFlashLoan(currentOffset, callerAddress);
+            return morphoFlashLoan(currentOffset, callerAddress, amount);
         } else if (flashLoanType == FlashLoanIds.AAVE_V3) {
-            return aaveV3FlashLoan(currentOffset, callerAddress);
+            return aaveV3FlashLoan(currentOffset, callerAddress, amount);
         } else if (flashLoanType == FlashLoanIds.AAVE_V2) {
-            return aaveV2FlashLoan(currentOffset, callerAddress);
+            return aaveV2FlashLoan(currentOffset, callerAddress, amount);
         } else if (flashLoanType == FlashLoanIds.BALANCER_V2) {
-            return balancerV2FlashLoan(currentOffset, callerAddress);
+            return balancerV2FlashLoan(currentOffset, callerAddress, amount);
         } else {
             _invalidOperation();
         }

@@ -14,29 +14,28 @@ contract AaveV2FlashLoans is Masks {
      * |--------|----------------|---------------------------------|
      * | 0      | 20             | asset                           |
      * | 20     | 20             | pool                            | <-- we allow ANY aave v2 style pool here
-     * | 40     | 16             | amount                          |
-     * | 56     | 2              | paramsLength                    |
-     * | 58     | paramsLength   | params                          |
+     * | 40     | 2              | paramsLength                    |
+     * | 42     | paramsLength   | params                          |
      */
     function aaveV2FlashLoan(
         uint256 currentOffset,
-        address callerAddress
+        address callerAddress,
+        uint256 amount
     ) internal returns (uint256) {
         assembly {
             // get token to loan
             let token := shr(96, calldataload(currentOffset))
 
+            let slice := calldataload(add(currentOffset, 20))
+
             // target to call
-            let pool := shr(96, calldataload(add(currentOffset, 20)))
+            let pool := shr(96, slice)
 
-            // second calldata slice including amount annd params length
-            let slice := calldataload(add(currentOffset, 40))
-            let amount := shr(128, slice) // shr will already mask uint112 here
             // length of params
-            let calldataLength := and(UINT16_MASK, shr(112, slice))
+            let calldataLength := and(UINT16_MASK, shr(80, slice))
 
-            // skip addresses and amount
-            currentOffset := add(currentOffset, 58)
+            // skip token, pool and params length
+            currentOffset := add(currentOffset, 42)
 
             // call flash loan
             let ptr := mload(0x40)

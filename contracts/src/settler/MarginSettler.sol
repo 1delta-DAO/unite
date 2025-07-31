@@ -17,13 +17,15 @@ import {ContractSigner} from "../signer/ContractSigner.sol";
 import "../Errors.sol";
 import {ComposerCommands} from "../composer/lib/enums/DeltaEnums.sol";
 import {Composer} from "../composer/Composer.sol";
+import {UniversalFlashLoan} from "../composer/flashLoan/UniversalFlashLoan.sol";
 
 contract MarginSettler is
     IPreInteraction,
     IPostInteraction,
     ITakerInteraction,
     ContractSigner,
-    Composer
+    Composer,
+    UniversalFlashLoan
 {
     using AddressLib for Address;
     using SafeERC20 for IERC20;
@@ -100,6 +102,12 @@ contract MarginSettler is
                     currentOffset,
                     callerAddress,
                     depositAmount
+                );
+            } else if (operation == ComposerCommands.FLASH_LOAN) {
+                currentOffset = _universalFlashLoan(
+                    currentOffset,
+                    callerAddress,
+                    borrowAmount
                 );
             } else {
                 _invalidOperation();

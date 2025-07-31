@@ -17,27 +17,24 @@ abstract contract BalancerV2FlashLoans is Slots, Masks {
      * | Offset | Length (bytes) | Description                     |
      * |--------|----------------|---------------------------------|
      * | 0      | 20             | asset                           |
-     * | 20     | 16             | amount                          |
-     * | 36     | 2              | paramsLength                    |
-     * | 38     | paramsLength   | params                          | <- the first param here is the poolId
+     * | 20     | 2              | paramsLength                    |
+     * | 22     | paramsLength   | params                          | <- the first param here is the poolId
      */
     function balancerV2FlashLoan(
         uint256 currentOffset,
-        address callerAddress
+        address callerAddress,
+        uint256 amount
     ) internal returns (uint256) {
         assembly {
+            let slice := calldataload(currentOffset)
             // get token to loan
-            let token := shr(96, calldataload(currentOffset))
-
-            // second calldata slice including amount annd params length
-            let slice := calldataload(add(currentOffset, 20))
-            let amount := shr(128, slice) // shr will already mask uint112 here
+            let token := shr(96, slice)
             // length of params
-            let calldataLength := and(UINT16_MASK, shr(112, slice))
+            let calldataLength := and(UINT16_MASK, shr(80, slice))
 
             let pool
             // switch-case over poolId to ensure trusted target
-            switch and(UINT8_MASK, shr(104, slice))
+            switch and(UINT8_MASK, shr(72, slice))
             case 0 {
                 pool := BALANCER_V2
             }
@@ -47,8 +44,8 @@ abstract contract BalancerV2FlashLoans is Slots, Masks {
             default {
                 revert(0, 0)
             }
-            // skip addresses and amount
-            currentOffset := add(currentOffset, 38)
+            // skip token and params length
+            currentOffset := add(currentOffset, 22)
             // balancer should be the secondary choice
             let ptr := mload(0x40)
             // flashLoan(...)

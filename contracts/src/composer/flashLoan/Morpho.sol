@@ -14,26 +14,24 @@ contract MorphoFlashLoans is Masks {
      * |--------|----------------|---------------------------------|
      * | 0      | 20             | asset                           |
      * | 20     | 20             | pool                            | <-- we allow ANY morpho style pool here
-     * | 40     | 16             | amount                          |
-     * | 56     | 2              | paramsLength                    |
-     * | 58     | paramsLength   | params                          |
+     * | 40     | 2              | paramsLength                    |
+     * | 42     | paramsLength   | params                          |
      */
     function morphoFlashLoan(
         uint256 currentOffset,
-        address callerAddress
+        address callerAddress,
+        uint256 amount
     ) internal returns (uint256) {
         assembly {
             // get token to loan
             let token := shr(96, calldataload(currentOffset))
             // morpho-like pool as target
-            let pool := shr(96, calldataload(add(currentOffset, 20)))
-            // second calldata slice including amount annd params length
-            let slice := calldataload(add(currentOffset, 40))
-            let amount := shr(128, slice) // shr will already mask uint128 here
+            let slice := calldataload(add(currentOffset, 20))
+            let pool := shr(96, slice)
             // length of params
-            let calldataLength := and(UINT16_MASK, shr(112, slice))
-            // skip uint128 and uint16
-            currentOffset := add(currentOffset, 58)
+            let calldataLength := and(UINT16_MASK, shr(80, slice))
+            // skip token, pool and params length
+            currentOffset := add(currentOffset, 42)
 
             // morpho should be the primary choice
             let ptr := mload(0x40)
