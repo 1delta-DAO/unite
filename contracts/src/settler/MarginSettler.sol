@@ -4,6 +4,7 @@ pragma solidity 0.8.30;
 import {Address, AddressLib} from "@1inch/solidity-utils/contracts/libraries/AddressLib.sol";
 import {SafeERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 import {UniERC20} from "@1inch/solidity-utils/contracts/libraries/UniERC20.sol";
+import {ECDSA} from "@1inch/solidity-utils/contracts/libraries/ECDSA.sol";
 import {IOrderMixin} from "@1inch/lo/interfaces/IOrderMixin.sol";
 import {IPreInteraction} from "@1inch/lo/interfaces/IPreInteraction.sol";
 import {IPostInteraction} from "@1inch/lo/interfaces/IPostInteraction.sol";
@@ -23,7 +24,6 @@ import {UniversalFlashLoan} from "../composer/flashLoan/UniversalFlashLoan.sol";
 import {ExternalCall} from "../composer/externalCall/ExternalCall.sol";
 import {Transfers} from "../composer/transfers/Transfers.sol";
 import {Permits} from "../composer/permit/Permits.sol";
-import {console} from "forge-std/console.sol";
 import "../Errors.sol";
 
 contract MarginSettler is
@@ -66,6 +66,44 @@ contract MarginSettler is
         return _hashTypedDataV4(keccak256(extension));
     }
 
+    /// @dev The typehash of the order struct.
+    bytes32 constant internal _LIMIT_ORDER_TYPEHASH = keccak256(
+        "Order("
+            "uint256 salt,"
+            "address maker,"
+            "address receiver,"
+            "address makerAsset,"
+            "address takerAsset,"
+            "uint256 makingAmount,"
+            "uint256 takingAmount,"
+            "uint256 makerTraits"
+        ")"
+    );
+    uint256 constant internal _ORDER_STRUCT_SIZE = 0x100;
+    uint256 constant internal _DATA_HASH_SIZE = 0x120;
+
+
+    bytes32 private constant TYPE_HASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+
+    function _buildDomainSeparator1inch() private view returns (bytes32) {
+        return keccak256(abi.encode(TYPE_HASH, keccak256(bytes("1inch Aggregation Router")), keccak256(bytes("6")), block.chainid, _LIMIT_ORDER_PROTOCOL));
+    }
+
+    function hashOrder(IOrderMixin.Order calldata order) external view returns(bytes32 result) {
+        bytes32 domainSeparator = _buildDomainSeparator1inch();
+        bytes32 typehash = _LIMIT_ORDER_TYPEHASH;
+        assembly ("memory-safe") { // solhint-disable-line no-inline-assembly
+            let ptr := mload(0x40)
+
+            // keccak256(abi.encode(_LIMIT_ORDER_TYPEHASH, order));
+            mstore(ptr, typehash)
+            calldatacopy(add(ptr, 0x20), order, _ORDER_STRUCT_SIZE)
+            result := keccak256(ptr, _DATA_HASH_SIZE)
+        }
+        result = ECDSA.toTypedDataHash(domainSeparator, result);
+    }
+
     function preInteraction(
         IOrderMixin.Order calldata order,
         bytes calldata extension,
@@ -77,7 +115,6 @@ contract MarginSettler is
         bytes calldata extraData
     ) external override onlyLimitOrderProtocol {
         address user = order.receiver.get();
-        console.log(user);
         // The lending operations map taker and maker amount as makerAmount: inputAmount, takerAmount: outputAmount
         _composer(user, takingAmount, makingAmount, extraData);
     }
@@ -182,7 +219,6 @@ contract MarginSettler is
             revert InvalidExtensionLength();
         }
 
-        console.log("extension", extension.length);
         // last 65 bytes of the extension is the typedHash signature of the extension
         bytes memory extensionSignature = new bytes(65);
         assembly {
@@ -196,12 +232,9 @@ contract MarginSettler is
             mstore(extension, sub(mload(extension), 65))
         }
 
-        console.log("extension", extension.length);
         bytes32 extensionHash = _hashTypedDataV4(keccak256(extension));
-        console.logBytes32(extensionHash);
         // recover the signer of the extension
         address signer = _recoverSigner(extensionHash, extensionSignature);
-        console.log("signer of extension", signer);
         return
             IOrderMixin(_LIMIT_ORDER_PROTOCOL).fillContractOrderArgs(
                 order,

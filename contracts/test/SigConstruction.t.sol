@@ -21,7 +21,7 @@ contract SigConstructionTest is MarginSettlerTest {
 
         IOrderMixin.Order memory order = _createOrder();
 
-        bytes32 orderHash = keccak256(abi.encode(order));
+        bytes32 orderHash = marginSettler.hashOrder(order);
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, orderHash);
 
