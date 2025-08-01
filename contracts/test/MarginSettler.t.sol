@@ -13,12 +13,17 @@ import {CalldataLib} from "../src/composer/utils/CalldataLib.sol";
 import {SweepType} from "../src/composer/lib/enums/MiscEnums.sol";
 
 contract MarginSettlerTest is Test {
+    bytes32 constant DOMAIN_SEPARATOR =
+        0x076055e6d39ad67389e67f0a2296f77935b06fe3fa8764b71089768788c0a53d;
+
     address constant LIMIT_ORDER_PROTOCOL =
         0x7F069df72b7A39bCE9806e3AfaF579E54D8CF2b9;
     address constant WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
     address constant USDC = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831;
     address constant AAVE_V3_POOL = 0x794a61358D6845594F94dc1DB02A252b5b4814aD;
     address constant AAVE_V3_WETH = 0xe50fA9b3c56FfB159cB0FCA61F5c9D750e8128c8;
+    address constant AAVE_v3_WETH_DEBT =
+        0x0c84331e39d6658Cd6e6b9ba04736cC4c4734351;
     address constant AAVE_V3_USDC = 0x625E7708f30cA75bfd92586e17077590C60eb4cD;
     address constant CALL_FORWARDER =
         0xfCa1154C643C32638AEe9a43eeE7f377f515c801;
@@ -56,6 +61,39 @@ contract MarginSettlerTest is Test {
         vm.createSelectFork("wss://arbitrum-one-rpc.publicnode.com");
     }
 
+    function testOrder() public {
+        IOrderMixin.Order memory order = _createOrder();
+        // sign the order
+        bytes32 orderHash = IOrderMixin(LIMIT_ORDER_PROTOCOL).hashOrder(order);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPrivateKey, orderHash);
+
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        // populate args
+        bytes memory args;
+
+        // calldata
+
+        bytes memory preInteractionCalldata = _createPreInteractionCalldata();
+        bytes
+            memory takerInteractionCalldata = _createTakerInteractionCalldata();
+        bytes memory postInteractionCalldata = _createPostInteractionCalldata();
+
+        bytes memory extensionCalldata;
+
+        marginSettler.takeOrder(
+            order,
+            signature,
+            3500 * 1e6,
+            _createTakerTraits(
+                extensionCalldata.length,
+                takerInteractionCalldata.length
+            ),
+            abi.encodePacked(extensionCalldata, takerInteractionCalldata)
+        );
+    }
+
     function _createMakerTraits() internal view returns (MakerTraits) {
         uint256 traits = 0;
 
@@ -76,6 +114,21 @@ contract MarginSettlerTest is Test {
             120;
 
         return MakerTraits.wrap(traits);
+    }
+
+    function _createTakerTraits(
+        uint256 extensionLength,
+        uint256 interactionLength
+    ) internal view returns (TakerTraits) {
+        uint256 traits = 0;
+
+        // ARGS_EXTENSION_LENGTH
+        traits |= (uint184(extensionLength) << 224);
+
+        // ARGS_INTERACTION_LENGTH
+        traits |= (uint184(interactionLength) << 200);
+
+        return TakerTraits.wrap(traits);
     }
 
     function _createOrder() internal view returns (IOrderMixin.Order memory) {
@@ -137,4 +190,38 @@ contract MarginSettlerTest is Test {
                 )
             );
     }
+
+    function _createPreInteractionCalldata()
+        internal
+        view
+        returns (bytes memory)
+    {
+        // TODO
+        return "";
+    }
+
+    function _createTakerInteractionCalldata()
+        internal
+        view
+        returns (bytes memory)
+    {
+        // TODO
+        return "";
+    }
+
+    function _createPostInteractionCalldata()
+        internal
+        view
+        returns (bytes memory)
+    {
+        // TODO
+        return "";
+    }
+
+    function _createExtensionCalldata() internal view returns (bytes memory) {
+        // TODO
+        return "";
+    }
+
+    // abi.encodeWithSelector(0xc04a8a10, abi.encode(address(marginSettler, type(uint256).max)));
 }
