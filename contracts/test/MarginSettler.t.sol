@@ -123,10 +123,10 @@ contract MarginSettlerTest is Test {
         uint256 traits = 0;
 
         // ARGS_EXTENSION_LENGTH
-        traits |= (uint184(extensionLength) << 224);
+        traits |= (extensionLength << 224);
 
         // ARGS_INTERACTION_LENGTH
-        traits |= (uint184(interactionLength) << 200);
+        traits |= (interactionLength << 200);
 
         return TakerTraits.wrap(traits);
     }

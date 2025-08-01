@@ -2,7 +2,6 @@
 pragma solidity ^0.8.30;
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
-
 import "../Errors.sol";
 
 abstract contract ContractSigner is IERC1271 {
@@ -53,9 +52,9 @@ abstract contract ContractSigner is IERC1271 {
 
         assembly {
             let offset := add(signature, 0x20)
-            r := calldataload(offset)
-            s := calldataload(add(offset, 0x20))
-            v := shr(248, calldataload(add(offset, 0x40)))
+            r := mload(offset)
+            s := mload(add(offset, 0x20))
+            v := shr(248, mload(add(offset, 0x40)))
         }
 
         return ECDSA.recover(orderHash, v, r, s);
