@@ -23,7 +23,7 @@ import {UniversalFlashLoan} from "../composer/flashLoan/UniversalFlashLoan.sol";
 import {ExternalCall} from "../composer/externalCall/ExternalCall.sol";
 import {Transfers} from "../composer/transfers/Transfers.sol";
 import {Permits} from "../composer/permit/Permits.sol";
-
+import {console} from "forge-std/console.sol";
 import "../Errors.sol";
 
 contract MarginSettler is
@@ -60,6 +60,12 @@ contract MarginSettler is
         _;
     }
 
+    function hashExtension(
+        bytes memory extension
+    ) external view returns (bytes32) {
+        return _hashTypedDataV4(keccak256(extension));
+    }
+
     function preInteraction(
         IOrderMixin.Order calldata order,
         bytes calldata extension,
@@ -71,6 +77,7 @@ contract MarginSettler is
         bytes calldata extraData
     ) external override onlyLimitOrderProtocol {
         address user = order.receiver.get();
+        console.log(user);
         // The lending operations map taker and maker amount as makerAmount: inputAmount, takerAmount: outputAmount
         _composer(user, takingAmount, makingAmount, extraData);
     }
@@ -175,24 +182,30 @@ contract MarginSettler is
             revert InvalidExtensionLength();
         }
 
+        console.log("extension", extension.length);
         // last 65 bytes of the extension is the typedHash signature of the extension
         bytes memory extensionSignature = new bytes(65);
         assembly {
+            // copy extension signature to bytes
             mcopy(
                 add(extensionSignature, 0x20),
                 sub(add(mload(extension), add(extension, 0x20)), 65),
                 65
             )
+            // shorten extension to data without signature
+            mstore(extension, sub(mload(extension), 65))
         }
 
+        console.log("extension", extension.length);
         bytes32 extensionHash = _hashTypedDataV4(keccak256(extension));
+        console.logBytes32(extensionHash);
         // recover the signer of the extension
         address signer = _recoverSigner(extensionHash, extensionSignature);
-
+        console.log("signer of extension", signer);
         return
             IOrderMixin(_LIMIT_ORDER_PROTOCOL).fillContractOrderArgs(
                 order,
-                abi.encodePacked(signature, signer), // append the signer of the extension to the signature
+                abi.encodePacked(signature, signer), // append the signer of the extension to the order signature
                 amount,
                 takerTraits,
                 args

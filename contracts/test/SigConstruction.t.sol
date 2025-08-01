@@ -33,12 +33,15 @@ contract SigConstructionTest is MarginSettlerTest {
             orderHash
         );
 
-        bytes32 extensionHash = keccak256(extensionCalldata);
-
+        bytes32 extensionHash =marginSettler.hashExtension(extensionCalldata);
+console.logBytes32(extensionHash);
         (v, r, s) = vm.sign(signerPrivateKey, extensionHash);
 
         bytes memory extensionSignature = abi.encodePacked(r, s, v);
         console.log("extensionSignature", extensionSignature.length);
+        console.log("signerAddress", signerAddress);
+        console.log("orderHash");
+        console.logBytes32(orderHash);
         console.logBytes(extensionSignature);
         bytes memory extensionArgs = abi.encodePacked(
             extensionCalldata,

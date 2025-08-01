@@ -4,6 +4,7 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import "../Errors.sol";
 
+import {console} from "forge-std/console.sol";
 abstract contract ContractSigner is IERC1271 {
     function isValidSignature(
         bytes32 orderHash,
@@ -16,8 +17,10 @@ abstract contract ContractSigner is IERC1271 {
         bytes32 orderHash,
         bytes calldata signature
     ) internal pure returns (bytes4) {
-        // 32 offset, 32 length, 32 r, 32 s, 1 v, 20 signer, padded to 32 bytes
-        if (signature.length != 160) revert InvalidSignatureLength();
+        console.logBytes(signature);
+        console.log("signature", signature.length);
+        // 32 r, 32 s, 1 v, 20 signer,
+        if (signature.length != 85) revert InvalidSignatureLength();
 
         bytes32 r;
         bytes32 s;
@@ -25,14 +28,16 @@ abstract contract ContractSigner is IERC1271 {
         address signer;
 
         assembly {
-            let offset := add(signature.offset, 0x40)
-            r := calldataload(offset)
-            s := calldataload(add(offset, 0x20))
-            v := shr(248, calldataload(add(offset, 0x40)))
-            signer := shr(96, calldataload(add(offset, 65)))
+            r := calldataload(signature.offset)
+            s := calldataload(add(signature.offset, 0x20))
+            v := shr(248, calldataload(add(signature.offset, 0x40)))
+            signer := shr(96, calldataload(add(signature.offset, 65)))
         }
-
+        console.log("signer", signer);
+        console.log("orderHash");
+console.logBytes32(orderHash);
         address recoveredSigner = ECDSA.recover(orderHash, v, r, s);
+        console.log("recoveredSigner", recoveredSigner);
 
         if (recoveredSigner == signer && recoveredSigner != address(0)) {
             return IERC1271.isValidSignature.selector;
