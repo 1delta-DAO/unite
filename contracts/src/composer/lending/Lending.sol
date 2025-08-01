@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
-import {LenderOps, LenderIds} from "./lib/enums/DeltaEnums.sol";
-import {AaveLending} from "./lending/AaveLending.sol";
-import {CompoundV2Lending} from "./lending/CompoundV2Lending.sol";
-import {CompoundV3Lending} from "./lending/CompoundV3Lending.sol";
-import {MorphoLending} from "./lending/MorphoLending.sol";
-import "../Errors.sol";
+import {LenderOps, LenderIds} from "../lib/enums/DeltaEnums.sol";
+import {AaveLending} from "./AaveLending.sol";
+import {CompoundV2Lending} from "./CompoundV2Lending.sol";
+import {CompoundV3Lending} from "./CompoundV3Lending.sol";
+import {MorphoLending} from "./MorphoLending.sol";
+import "../../Errors.sol";
 
-abstract contract Composer is
+abstract contract Lending is
     AaveLending,
     CompoundV2Lending,
     CompoundV3Lending,

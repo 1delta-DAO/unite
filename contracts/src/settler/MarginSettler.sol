@@ -18,7 +18,7 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ContractSigner} from "../signer/ContractSigner.sol";
 
 import {ComposerCommands} from "../composer/lib/enums/DeltaEnums.sol";
-import {Composer} from "../composer/Composer.sol";
+import {Lending} from "../composer/lending/Lending.sol";
 import {UniversalFlashLoan} from "../composer/flashLoan/UniversalFlashLoan.sol";
 import {ExternalCall} from "../composer/externalCall/ExternalCall.sol";
 import {Transfers} from "../composer/transfers/Transfers.sol";
@@ -31,7 +31,7 @@ contract MarginSettler is
     ITakerInteraction,
     IPreInteraction,
     ContractSigner,
-    Composer,
+    Lending,
     UniversalFlashLoan,
     ExternalCall,
     Transfers,
