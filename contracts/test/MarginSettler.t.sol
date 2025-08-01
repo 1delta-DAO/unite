@@ -20,7 +20,7 @@ contract MarginSettlerTest is Test {
     address constant AAVE_V3_POOL = 0x794a61358D6845594F94dc1DB02A252b5b4814aD;
     address constant AAVE_V3_WETH = 0xe50fA9b3c56FfB159cB0FCA61F5c9D750e8128c8;
     address constant AAVE_V3_USDC = 0x625E7708f30cA75bfd92586e17077590C60eb4cD;
-    address constant EXTERNAL_CALL_CONTRACT =
+    address constant CALL_FORWARDER =
         0xfCa1154C643C32638AEe9a43eeE7f377f515c801;
     address constant UNISWAP_V3_FACTORY =
         0x1F98431c8aD98523631AE4a59f267346ea31F984;
@@ -32,15 +32,6 @@ contract MarginSettlerTest is Test {
     MarginSettler public marginSettler;
     address public user;
     uint256 public userPrivateKey;
-
-    // Mock contracts for testing
-    address public mockLimitOrderProtocol;
-    address public mockWeth;
-    address public mockUsdc;
-    address public mockAavePool;
-    address public mockAaveWeth;
-    address public mockAaveUsdc;
-    address public mockAggregator;
 
     function setUp() public {
         VmSafe.Wallet memory userWallet = vm.createWallet("user");
@@ -57,7 +48,7 @@ contract MarginSettlerTest is Test {
         vm.label(AAVE_V3_POOL, "aaveV3Pool");
         vm.label(AAVE_V3_WETH, "aaveV3Weth");
         vm.label(AAVE_V3_USDC, "aaveV3Usdc");
-        vm.label(EXTERNAL_CALL_CONTRACT, "CallForwarder");
+        vm.label(CALL_FORWARDER, "CallForwarder");
         vm.label(UNISWAP_V3_FACTORY, "uniswapV3Factory");
         vm.label(UNISWAP_V3_ROUTER, "uniswapV3Router");
         vm.label(UNISWAP_V3_QUOTER, "uniswapV3Quoter");
@@ -99,5 +90,51 @@ contract MarginSettlerTest is Test {
                 takingAmount: 1000 * 1e6,
                 makerTraits: _createMakerTraits()
             });
+    }
+
+    function _createSwapCalldata() internal view returns (bytes memory) {
+        // in taker interaction, we swap the maker token to taker token
+        bytes memory extCalldata = abi.encodeWithSelector(
+            0x414bf389, // exactInputSingle
+            abi.encode(
+                WETH,
+                USDC,
+                3000,
+                address(marginSettler),
+                block.timestamp + 1800,
+                1 * 1e18,
+                0,
+                0
+            )
+        );
+        extCalldata = CalldataLib.encodeExternalCall(
+            UNISWAP_V3_ROUTER,
+            0,
+            false,
+            extCalldata
+        );
+        extCalldata = CalldataLib.encodeExternalCall(
+            CALL_FORWARDER,
+            0,
+            false,
+            extCalldata
+        );
+        return extCalldata;
+    }
+
+    function _createGetFlashloanCalldata()
+        internal
+        view
+        returns (bytes memory)
+    {
+        return
+            CalldataLib.encodeBalancerV2FlashLoan(
+                USDC,
+                uint8(0),
+                abi.encodePacked(
+                    CalldataLib.encodeAaveDeposit(USDC, user, AAVE_V3_POOL),
+                    CalldataLib.encodeAaveBorrow(WETH, user, 0, AAVE_V3_POOL)
+                )
+            );
     }
 }
