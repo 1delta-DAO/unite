@@ -2,7 +2,7 @@
 pragma solidity ^0.8.30;
 
 import {Test, console} from "forge-std/Test.sol";
-import {ContractSigner} from "../src/ContractSigner.sol";
+import {ContractSigner} from "../src/signer/ContractSigner.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {VmSafe} from "forge-std/Vm.sol";
