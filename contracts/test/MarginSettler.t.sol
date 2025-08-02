@@ -113,6 +113,14 @@ contract MarginSettlerTest is Test {
             ) <<
             120;
 
+
+         // expiry
+        // traits |=
+        //     uint256(
+        //         uint40(1)
+        //     ) <<
+        //     80;
+
         return MakerTraits.wrap(traits);
     }
 

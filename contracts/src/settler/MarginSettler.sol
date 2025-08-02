@@ -11,6 +11,7 @@ import {IPostInteraction} from "@1inch/lo/interfaces/IPostInteraction.sol";
 import {ITakerInteraction} from "@1inch/lo/interfaces/ITakerInteraction.sol";
 import {MakerTraits, MakerTraitsLib} from "@1inch/lo/libraries/MakerTraitsLib.sol";
 import {TakerTraits, TakerTraitsLib} from "@1inch/lo/libraries/TakerTraitsLib.sol";
+import {ExtensionLib} from "@1inch/lo/libraries/ExtensionLib.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -117,6 +118,12 @@ contract MarginSettler is
         address user = order.receiver.get();
         // The lending operations map taker and maker amount as makerAmount: inputAmount, takerAmount: outputAmount
         _composer(user, takingAmount, makingAmount, extraData);
+    }
+
+    function preInteractionTargetAndData(
+        bytes calldata data
+    ) external pure returns(bytes memory) {
+        return ExtensionLib.preInteractionTargetAndData(data);
     }
 
     function _composer(
@@ -257,7 +264,7 @@ contract MarginSettler is
         TakerTraits takerTraits,
         bytes calldata args
     )
-        private
+        public
         view
         returns (
             address target,
