@@ -18,12 +18,12 @@ import {LendingEncoder} from "./utils/LendingEncoder.sol";
 interface IDelegation {
     function approveDelegation(address, uint) external;
 
-      function supply(
-    address asset,
-    uint256 amount,
-    address onBehalfOf,
-    uint16 referralCode
-  ) external;
+    function supply(
+        address asset,
+        uint256 amount,
+        address onBehalfOf,
+        uint16 referralCode
+    ) external;
 }
 
 contract SigConstructionTest is MarginSettlerTest {
@@ -145,10 +145,11 @@ contract SigConstructionTest is MarginSettlerTest {
         // TakerTraits takerTraits = _createTakerTraits(extensionArgs.length, 0);
 
         // test calls
-        // (, bytes memory a, ) = marginSettler._parseArgs(
-        //     takerTraits,
-        //     extensionArgs
-        // );
+        // {        (, bytes memory a, bytes memory b ) = marginSettler._parseArgs(
+        //             _createTakerTraits(extensionArgs.length, 0),
+        //             extensionArgs
+        //         );
+        //         console.logBytes(b);}
         // marginSettler.preInteractionTargetAndData(a);
         // console.logBytes(extensionArgs);
         // vm.expectRevert(0x398d4d32);
@@ -160,14 +161,20 @@ contract SigConstructionTest is MarginSettlerTest {
         //     extensionArgs
         // );
 
+        // approve pool
         vm.prank(signerAddress);
         IERC20(WETH).approve(AAVE_V3_POOL, type(uint).max);
 
+        // deposit margin
         vm.prank(signerAddress);
         IDelegation(AAVE_V3_POOL).supply(WETH, 0.1e18, signerAddress, 0);
 
+        // approve borrowing
         vm.prank(signerAddress);
-        IDelegation(AAVE_V3_USDC_DEBT).approveDelegation(address(marginSettler), type(uint).max);
+        IDelegation(AAVE_V3_USDC_DEBT).approveDelegation(
+            address(marginSettler),
+            type(uint).max
+        );
 
         marginSettler.flashLoanFill(
             AddressLib.get(order.takerAsset),

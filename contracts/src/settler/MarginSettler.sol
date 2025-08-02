@@ -247,8 +247,9 @@ contract MarginSettler is
         returns (uint256 makingAmount, uint256 takingAmount, bytes32 orderHash)
     {
         // approve self
-        IERC20(order.takerAsset.get()).approve(address(this), type(uint).max);
-        IERC20(order.makerAsset.get()).approve(address(this), type(uint).max);
+        IERC20(order.takerAsset.get()).approve(_LIMIT_ORDER_PROTOCOL, type(uint).max);
+        IERC20(order.makerAsset.get()).approve(_LIMIT_ORDER_PROTOCOL, type(uint).max);
+
 
         // extract extension
         (, bytes memory extension, ) = _parseArgs(takerTraits, args);
