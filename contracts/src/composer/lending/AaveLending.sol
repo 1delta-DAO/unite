@@ -117,9 +117,8 @@ abstract contract AaveLending is ERC20Selectors, Masks {
      * | Offset | Length (bytes) | Description                     |
      * |--------|----------------|---------------------------------|
      * | 0      | 20             | underlying                      |
-     * | 20     | 20             | receiver                        |
+     * | 20     | 20             | pool                            |
      * | 40     | 1              | mode                            |
-     * | 41     | 20             | pool                            |
      */
     function _borrowFromAave(
         uint256 currentOffset,
@@ -128,16 +127,15 @@ abstract contract AaveLending is ERC20Selectors, Masks {
     ) internal returns (uint256) {
         assembly {
             let underlying := shr(96, calldataload(currentOffset))
-            // receiver
-            let receiver := shr(96, calldataload(add(currentOffset, 20)))
+            let pool := calldataload(add(currentOffset, 20))
             let mode := and(
                 UINT8_MASK,
-                shr(88, calldataload(add(currentOffset, 40)))
+                shr(88, pool)
             )
             // get pool
-            let pool := shr(96, calldataload(add(currentOffset, 41)))
+             pool := shr(96, pool)
             // skip pool (end of data)
-            currentOffset := add(currentOffset, 61)
+            currentOffset := add(currentOffset, 41)
 
             amount := and(UINT120_MASK, amount)
 
@@ -177,37 +175,6 @@ abstract contract AaveLending is ERC20Selectors, Masks {
                     revert(0x0, returndatasize())
                 }
             }
-
-            //  transfer underlying if needed
-            if xor(receiver, address()) {
-                // selector for transfer(address,uint256)
-                mstore(ptr, ERC20_TRANSFER)
-                mstore(add(ptr, 0x04), receiver)
-                // mstore(add(ptr, 0x24), amount) <-- this one is still in this memo location
-
-                let success := call(gas(), underlying, 0, ptr, 0x44, ptr, 32)
-
-                let rdsize := returndatasize()
-
-                // Check for ERC20 success. ERC20 tokens should return a boolean,
-                // but some don't. We accept 0-length return data as success, or at
-                // least 32 bytes that starts with a 32-byte boolean true.
-                success := and(
-                    success, // call itself succeeded
-                    or(
-                        iszero(rdsize), // no return data, or
-                        and(
-                            gt(rdsize, 31), // at least 32 bytes
-                            eq(mload(ptr), 1) // starts with uint256(1)
-                        )
-                    )
-                )
-
-                if iszero(success) {
-                    returndatacopy(0, 0, rdsize)
-                    revert(0, rdsize)
-                }
-            }
         }
         return currentOffset;
     }
@@ -216,37 +183,26 @@ abstract contract AaveLending is ERC20Selectors, Masks {
      * | Offset | Length (bytes) | Description                     |
      * |--------|----------------|---------------------------------|
      * | 0      | 20             | underlying                      |
-     * | 20     | 20             | receiver                        |
-     * | 40     | 20             | pool                            |
+     * | 20     | 20             | pool                            |
      */
     /// @notice Withdraw from lender lastgiven user address and lender Id
     function _depositToAaveV3(
         uint256 currentOffset,
-        uint256 amount
+        uint256 amount,
+        address user
     ) internal returns (uint256) {
         assembly {
             let underlying := shr(96, calldataload(currentOffset))
             // receiver
-            let receiver := shr(96, calldataload(add(currentOffset, 20)))
-            // get pool
-            let pool := shr(96, calldataload(add(currentOffset, 40)))
-            // skip pool (end of data)
-            currentOffset := add(currentOffset, 60)
-
-            amount := and(UINT120_MASK, amount)
-            // zero is this balance
-            if iszero(amount) {
-                // selector for balanceOf(address)
-                mstore(0, ERC20_BALANCE_OF)
-                // add this address as parameter
-                mstore(0x04, address())
-                // call to token
-                pop(staticcall(gas(), underlying, 0x0, 0x24, 0x0, 0x20))
-                // load the retrieved balance
-                amount := mload(0x0)
-            }
+            let pool := shr(96, calldataload(add(currentOffset, 20)))
+            currentOffset := add(currentOffset, 40)
 
             let ptr := mload(0x40)
+
+            mstore(ptr, ERC20_APPROVE)
+            mstore(add(ptr, 0x4), pool)
+            mstore(add(ptr, 0x24), MAX_UINT256)
+            pop(call(gas(), underlying, 0, ptr, 0x44, 0, 0))
 
             // selector supply(address,uint256,address,uint16)
             mstore(
@@ -255,7 +211,7 @@ abstract contract AaveLending is ERC20Selectors, Masks {
             )
             mstore(add(ptr, 0x04), underlying)
             mstore(add(ptr, 0x24), amount)
-            mstore(add(ptr, 0x44), receiver)
+            mstore(add(ptr, 0x44), user)
             mstore(add(ptr, 0x64), 0x0)
             // call pool
             if iszero(call(gas(), pool, 0x0, ptr, 0x84, 0x0, 0x0)) {
@@ -270,44 +226,20 @@ abstract contract AaveLending is ERC20Selectors, Masks {
      * | Offset | Length (bytes) | Description                     |
      * |--------|----------------|---------------------------------|
      * | 0      | 20             | underlying                      |
-     * | 20     | 20             | receiver                        |
-     * | 40     | 20             | pool                            |
+     * | 20     | 20             | pool                            |
      */
     /// @notice Withdraw from lender lastgiven user address and lender Id
     function _depositToAaveV2(
         uint256 currentOffset,
-        uint256 amount
+        uint256 amount,
+        address user
     ) internal returns (uint256) {
         assembly {
             let underlying := shr(96, calldataload(currentOffset))
-            // receiver
-            let receiver := shr(96, calldataload(add(currentOffset, 20)))
             // get pool
-            let pool := shr(96, calldataload(add(currentOffset, 40)))
+            let pool := shr(96, calldataload(add(currentOffset, 20)))
             // skip pool (end of data)
-            currentOffset := add(currentOffset, 60)
-
-            amount := and(UINT120_MASK, amount)
-            // zero is this balance
-            if iszero(amount) {
-                // selector for balanceOf(address)
-                mstore(0, ERC20_BALANCE_OF)
-                // add this address as parameter
-                mstore(0x04, address())
-                // call to token
-                pop(
-                    staticcall(
-                        gas(),
-                        underlying, // token
-                        0x0,
-                        0x24,
-                        0x0,
-                        0x20
-                    )
-                )
-                // load the retrieved balance
-                amount := mload(0x0)
-            }
+            currentOffset := add(currentOffset, 40)
 
             let ptr := mload(0x40)
             // selector deposit(address,uint256,address,uint16)
@@ -317,7 +249,7 @@ abstract contract AaveLending is ERC20Selectors, Masks {
             )
             mstore(add(ptr, 0x04), underlying)
             mstore(add(ptr, 0x24), amount)
-            mstore(add(ptr, 0x44), receiver)
+            mstore(add(ptr, 0x44), user)
             mstore(add(ptr, 0x64), 0x0)
             // call pool
             if iszero(call(gas(), pool, 0x0, ptr, 0x84, 0x0, 0x0)) {

@@ -22,10 +22,12 @@ import {ContractSigner} from "../signer/ContractSigner.sol";
 import {ComposerCommands} from "../composer/lib/enums/DeltaEnums.sol";
 import {Lending} from "../composer/lending/Lending.sol";
 import {UniversalFlashLoan} from "../composer/flashLoan/UniversalFlashLoan.sol";
+import {MorphoFlashLoanSimple} from "../composer/flashLoan/MorphoSimple.sol";
 import {ExternalCall} from "../composer/externalCall/ExternalCall.sol";
 import {Transfers} from "../composer/transfers/Transfers.sol";
 import {Permits} from "../composer/permit/Permits.sol";
 import "../Errors.sol";
+import {console} from "forge-std/console.sol";
 
 contract MarginSettler is
     IPostInteraction,
@@ -33,6 +35,7 @@ contract MarginSettler is
     IPreInteraction,
     ContractSigner,
     Lending,
+    MorphoFlashLoanSimple,
     UniversalFlashLoan,
     ExternalCall,
     Transfers,
@@ -68,8 +71,9 @@ contract MarginSettler is
     }
 
     /// @dev The typehash of the order struct.
-    bytes32 constant internal _LIMIT_ORDER_TYPEHASH = keccak256(
-        "Order("
+    bytes32 internal constant _LIMIT_ORDER_TYPEHASH =
+        keccak256(
+            "Order("
             "uint256 salt,"
             "address maker,"
             "address receiver,"
@@ -78,23 +82,36 @@ contract MarginSettler is
             "uint256 makingAmount,"
             "uint256 takingAmount,"
             "uint256 makerTraits"
-        ")"
-    );
-    uint256 constant internal _ORDER_STRUCT_SIZE = 0x100;
-    uint256 constant internal _DATA_HASH_SIZE = 0x120;
-
+            ")"
+        );
+    uint256 internal constant _ORDER_STRUCT_SIZE = 0x100;
+    uint256 internal constant _DATA_HASH_SIZE = 0x120;
 
     bytes32 private constant TYPE_HASH =
-        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+        keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+        );
 
     function _buildDomainSeparator1inch() private view returns (bytes32) {
-        return keccak256(abi.encode(TYPE_HASH, keccak256(bytes("1inch Aggregation Router")), keccak256(bytes("6")), block.chainid, _LIMIT_ORDER_PROTOCOL));
+        return
+            keccak256(
+                abi.encode(
+                    TYPE_HASH,
+                    keccak256(bytes("1inch Aggregation Router")),
+                    keccak256(bytes("6")),
+                    block.chainid,
+                    _LIMIT_ORDER_PROTOCOL
+                )
+            );
     }
 
-    function hashOrder(IOrderMixin.Order calldata order) external view returns(bytes32 result) {
+    function hashOrder(
+        IOrderMixin.Order calldata order
+    ) external view returns (bytes32 result) {
         bytes32 domainSeparator = _buildDomainSeparator1inch();
         bytes32 typehash = _LIMIT_ORDER_TYPEHASH;
-        assembly ("memory-safe") { // solhint-disable-line no-inline-assembly
+        assembly ("memory-safe") {
+            // solhint-disable-line no-inline-assembly
             let ptr := mload(0x40)
 
             // keccak256(abi.encode(_LIMIT_ORDER_TYPEHASH, order));
@@ -115,31 +132,39 @@ contract MarginSettler is
         uint256 remainingMakingAmount,
         bytes calldata extraData
     ) external override onlyLimitOrderProtocol {
+        // usafe: the receiver cannot be the user here, the user data should be extracted from the order or extension data (via signer)
         address user = order.receiver.get();
         // The lending operations map taker and maker amount as makerAmount: inputAmount, takerAmount: outputAmount
-        _composer(user, takingAmount, makingAmount, extraData);
+        _composer(user, takingAmount, makingAmount, extension);
     }
 
     function preInteractionTargetAndData(
         bytes calldata data
-    ) external pure returns(bytes memory) {
+    ) external pure returns (bytes memory) {
         return ExtensionLib.preInteractionTargetAndData(data);
     }
 
     function _composer(
         address callerAddress,
-        uint256 depositAmount,
-        uint256 borrowAmount,
+        uint256 takerAmount, // buy
+        uint256 makerAmount, // sell
         bytes calldata lendingOps
     ) internal {
         uint256 length;
         uint256 maxIndex;
         uint256 currentOffset;
+        bytes32 d;
         assembly {
-            length := calldataload(add(lendingOps.offset, 0x20))
+            length := sub(lendingOps.length, 84)
             maxIndex := add(length, lendingOps.offset)
-            currentOffset := add(lendingOps.offset, 0x40)
+            currentOffset := add(84, lendingOps.offset)
+            d := calldataload(add(84, lendingOps.offset))
         }
+        console.logBytes32(d);
+
+        console.log(address(this));
+        console.log("lendingOps");
+        console.logBytes(lendingOps);
 
         while (true) {
             uint256 operation;
@@ -149,18 +174,19 @@ contract MarginSettler is
                 // we increment the current offset to skip the operation
                 currentOffset := add(1, currentOffset)
             }
+            console.log("operation", operation);
             if (operation == ComposerCommands.LENDING) {
                 currentOffset = _lendingOperations(
                     callerAddress,
                     currentOffset,
-                    depositAmount,
-                    borrowAmount
+                    takerAmount,
+                    makerAmount
                 );
             } else if (operation == ComposerCommands.TRANSFERS) {
                 currentOffset = _transfers(
                     currentOffset,
                     callerAddress,
-                    depositAmount
+                    makerAmount
                 );
             } else if (operation == ComposerCommands.PERMIT) {
                 currentOffset = _permit(currentOffset, callerAddress);
@@ -168,7 +194,7 @@ contract MarginSettler is
                 currentOffset = _universalFlashLoan(
                     currentOffset,
                     callerAddress,
-                    borrowAmount
+                    makerAmount
                 );
             } else {
                 _invalidOperation();
@@ -220,6 +246,10 @@ contract MarginSettler is
         external
         returns (uint256 makingAmount, uint256 takingAmount, bytes32 orderHash)
     {
+        // approve self
+        IERC20(order.takerAsset.get()).approve(address(this), type(uint).max);
+        IERC20(order.makerAsset.get()).approve(address(this), type(uint).max);
+
         // extract extension
         (, bytes memory extension, ) = _parseArgs(takerTraits, args);
         if (extension.length < 65) {
@@ -252,6 +282,35 @@ contract MarginSettler is
             );
     }
 
+    function flashLoanFill(
+        address asset,
+        uint256 amount,
+        bytes calldata params
+    ) external {
+        morphoFlashLoanSimple(asset, amount, params);
+    }
+
+    /// @dev Morpho Blue flash loan callback
+    function onMorphoFlashLoan(uint256, bytes calldata data) external {
+        require(
+            msg.sender == 0x6c247b1F6182318877311737BaC0844bAa518F5e,
+            "NOT MB"
+        );
+        // get order params
+        (
+            IOrderMixin.Order memory order,
+            bytes memory signature,
+            uint256 amount,
+            TakerTraits takerTraits,
+            bytes memory args
+        ) = abi.decode(
+                data,
+                (IOrderMixin.Order, bytes, uint256, TakerTraits, bytes)
+            );
+        this.takeOrder(order, signature, amount, takerTraits, args);
+
+        IERC20(order.takerAsset.get()).approve(msg.sender, type(uint256).max);
+    }
     /**
      * @notice Processes the taker interaction arguments.
      * @param takerTraits The taker preferences for the order.

@@ -12,6 +12,8 @@ import {Address, AddressLib} from "@1inch/solidity-utils/contracts/libraries/Add
 import {CalldataLib} from "../src/composer/utils/CalldataLib.sol";
 import {SweepType} from "../src/composer/lib/enums/MiscEnums.sol";
 
+// @solhint-ignore private-vars-leading-underscore
+
 contract MarginSettlerTest is Test {
     bytes32 constant DOMAIN_SEPARATOR =
         0x076055e6d39ad67389e67f0a2296f77935b06fe3fa8764b71089768788c0a53d;
@@ -25,6 +27,7 @@ contract MarginSettlerTest is Test {
     address constant AAVE_v3_WETH_DEBT =
         0x0c84331e39d6658Cd6e6b9ba04736cC4c4734351;
     address constant AAVE_V3_USDC = 0x625E7708f30cA75bfd92586e17077590C60eb4cD;
+    address constant AAVE_V3_USDC_DEBT = 0xf611aEb5013fD2c0511c9CD55c7dc5C1140741A6;
     address constant CALL_FORWARDER =
         0xfCa1154C643C32638AEe9a43eeE7f377f515c801;
     address constant UNISWAP_V3_FACTORY =
@@ -145,10 +148,10 @@ contract MarginSettlerTest is Test {
                 salt: uint256(keccak256("testSalt")),
                 maker: Address.wrap(uint256(uint160(address(marginSettler)))),
                 receiver: Address.wrap(uint256(uint160(user))),
-                makerAsset: Address.wrap(uint256(uint160(WETH))),
-                takerAsset: Address.wrap(uint256(uint160(USDC))),
-                makingAmount: 1 * 1e18,
-                takingAmount: 1000 * 1e6,
+                takerAsset: Address.wrap(uint256(uint160(WETH))),
+                makerAsset: Address.wrap(uint256(uint160(USDC))),
+                takingAmount: 0.1e18,
+                makingAmount: 100.0e6,
                 makerTraits: _createMakerTraits()
             });
     }

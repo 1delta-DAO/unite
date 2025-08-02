@@ -16,8 +16,8 @@ abstract contract Lending is
     function _lendingOperations(
         address callerAddress,
         uint256 currentOffset,
-        uint256 depositAmount,
-        uint256 borrowAmount
+        uint256 takerAmount, // buy
+        uint256 makerAmount // sell
     ) internal returns (uint256) {
         uint256 lendingOperation;
         uint256 lender;
@@ -32,19 +32,19 @@ abstract contract Lending is
          */
         if (lendingOperation == LenderOps.DEPOSIT) {
             if (lender < LenderIds.UP_TO_AAVE_V3) {
-                return _depositToAaveV3(currentOffset, depositAmount);
+                return _depositToAaveV3(currentOffset, takerAmount, callerAddress);
             } else if (lender < LenderIds.UP_TO_AAVE_V2) {
-                return _depositToAaveV2(currentOffset, depositAmount);
+                return _depositToAaveV2(currentOffset, takerAmount, callerAddress);
             } else if (lender < LenderIds.UP_TO_COMPOUND_V3) {
-                return _depositToCompoundV3(currentOffset, depositAmount);
+                return _depositToCompoundV3(currentOffset, takerAmount);
             } else if (lender < LenderIds.UP_TO_COMPOUND_V2) {
-                return _depositToCompoundV2(currentOffset, depositAmount);
+                return _depositToCompoundV2(currentOffset, takerAmount);
             } else {
                 return
                     _encodeMorphoDepositCollateral(
                         currentOffset,
                         callerAddress,
-                        depositAmount
+                        takerAmount
                     );
             }
         }
@@ -54,24 +54,24 @@ abstract contract Lending is
         else if (lendingOperation == LenderOps.BORROW) {
             if (lender < LenderIds.UP_TO_AAVE_V2) {
                 return
-                    _borrowFromAave(currentOffset, callerAddress, borrowAmount);
+                    _borrowFromAave(currentOffset, callerAddress, makerAmount);
             } else if (lender < LenderIds.UP_TO_COMPOUND_V3) {
                 return
                     _borrowFromCompoundV3(
                         currentOffset,
                         callerAddress,
-                        borrowAmount
+                        makerAmount
                     );
             } else if (lender < LenderIds.UP_TO_COMPOUND_V2) {
                 return
                     _borrowFromCompoundV2(
                         currentOffset,
                         callerAddress,
-                        borrowAmount
+                        makerAmount
                     );
             } else {
                 return
-                    _morphoBorrow(currentOffset, callerAddress, borrowAmount);
+                    _morphoBorrow(currentOffset, callerAddress, makerAmount);
             }
         }
         /**
@@ -105,23 +105,6 @@ abstract contract Lending is
                         callerAddress
                     );
             }
-        }
-        /**
-         * deposit lendingToken
-         */
-        else if (lendingOperation == LenderOps.DEPOSIT_LENDING_TOKEN) {
-            return
-                _encodeMorphoDeposit(
-                    currentOffset,
-                    callerAddress,
-                    depositAmount
-                );
-        }
-        /**
-         * withdraw lendingToken
-         */
-        else if (lendingOperation == LenderOps.WITHDRAW_LENDING_TOKEN) {
-            return _encodeMorphoWithdraw(currentOffset, callerAddress);
         } else {
             _invalidOperation();
         }

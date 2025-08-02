@@ -13,15 +13,42 @@ import {Address, AddressLib} from "@1inch/solidity-utils/contracts/libraries/Add
 import {CalldataLib} from "../src/composer/utils/CalldataLib.sol";
 import {SweepType} from "../src/composer/lib/enums/MiscEnums.sol";
 import {MarginSettlerTest} from "./MarginSettler.t.sol";
+import {LendingEncoder} from "./utils/LendingEncoder.sol";
+
+interface IDelegation {
+    function approveDelegation(address, uint) external;
+
+      function supply(
+    address asset,
+    uint256 amount,
+    address onBehalfOf,
+    uint16 referralCode
+  ) external;
+}
 
 contract SigConstructionTest is MarginSettlerTest {
     uint256 internal constant zero = 0;
+
+    function createOpen(
+        address tokenIn,
+        address tokenOut,
+        address pool
+    ) internal pure returns (bytes memory d) {
+        d = abi.encodePacked(
+            LendingEncoder.encodeAaveDeposit(tokenOut, pool),
+            LendingEncoder.encodeAaveBorrow(tokenIn, pool)
+        );
+
+        return d;
+    }
+
     function test_sig_construct() external {
         VmSafe.Wallet memory wallet = vm.createWallet("signer");
         uint256 signerPrivateKey = wallet.privateKey;
         address signerAddress = wallet.addr;
 
         IOrderMixin.Order memory order = _createOrder();
+        order.receiver = Address.wrap(uint256(uint160(signerAddress)));
 
         // the calldata follows this pattern
         // enum DynamicField {
@@ -35,18 +62,21 @@ contract SigConstructionTest is MarginSettlerTest {
         //     PostInteractionData,
         //     CustomData
         // }
-
-        bytes memory extensionCalldata = abi.encodePacked(
-            zero, // MakerAssetSuffix
-            zero, // TakerAssetSuffix
-            zero, // MakingAmountData
-            zero, // TakingAmountData
-            zero, // Predicate (makerPermit is 0x)
-            address(marginSettler), // PreInteractionData
-            keccak256("000"),
-            keccak256("1")
+        // the data needs to be abi coded with offset and length
+        bytes memory extensionCalldata = abi.encode(
+            abi.encodePacked(
+                // zero, // MakerAssetSuffix
+                // zero, // TakerAssetSuffix
+                // zero, // MakingAmountData
+                // zero, // TakingAmountData
+                // zero, // Predicate (makerPermit is 0x)
+                address(marginSettler), // PreInteractionData
+                createOpen(USDC, WETH, AAVE_V3_POOL)
+            )
         );
         console.logBytes(extensionCalldata);
+
+        deal(WETH, signerAddress, 1.0e18);
         // errors
         // console.logBytes4(bytes4(keccak256("InvalidExtensionHash()")));
         // console.logBytes4(bytes4(keccak256("UnexpectedOrderExtension()")));
@@ -70,6 +100,7 @@ contract SigConstructionTest is MarginSettlerTest {
         // );
         // console.logBytes4(bytes4(keccak256("IncorrectCalldataParams()")));
         // console.logBytes4(bytes4(keccak256("OffsetOutOfBounds()")));
+        console.logBytes4(bytes4(keccak256("InvalidOperation()")));
 
         bytes32 extensionHash = marginSettler.hashExtension(extensionCalldata);
         console.logBytes32(extensionHash);
@@ -111,7 +142,7 @@ contract SigConstructionTest is MarginSettlerTest {
         );
         console.log("-------");
 
-        TakerTraits takerTraits = _createTakerTraits(extensionArgs.length, 0);
+        // TakerTraits takerTraits = _createTakerTraits(extensionArgs.length, 0);
 
         // test calls
         // (, bytes memory a, ) = marginSettler._parseArgs(
@@ -120,12 +151,34 @@ contract SigConstructionTest is MarginSettlerTest {
         // );
         // marginSettler.preInteractionTargetAndData(a);
         // console.logBytes(extensionArgs);
-        marginSettler.takeOrder(
-            order,
-            orderSignature,
+        // vm.expectRevert(0x398d4d32);
+        // marginSettler.takeOrder(
+        //     order,
+        //     orderSignature,
+        //     order.takingAmount,
+        //     takerTraits,
+        //     extensionArgs
+        // );
+
+        vm.prank(signerAddress);
+        IERC20(WETH).approve(AAVE_V3_POOL, type(uint).max);
+
+        vm.prank(signerAddress);
+        IDelegation(AAVE_V3_POOL).supply(WETH, 0.1e18, signerAddress, 0);
+
+        vm.prank(signerAddress);
+        IDelegation(AAVE_V3_USDC_DEBT).approveDelegation(address(marginSettler), type(uint).max);
+
+        marginSettler.flashLoanFill(
+            AddressLib.get(order.takerAsset),
             order.takingAmount,
-            takerTraits,
-            extensionArgs
+            abi.encode(
+                order,
+                orderSignature,
+                order.takingAmount,
+                _createTakerTraits(extensionArgs.length, 0),
+                extensionArgs
+            )
         );
     }
 }
