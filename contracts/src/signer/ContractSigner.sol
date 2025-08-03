@@ -3,6 +3,17 @@ pragma solidity ^0.8.30;
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import "../Errors.sol";
+
+/**
+ * Simple wrapped contract signer contract that validates a user signature.
+ *
+ * There are key differences to how contract signers are used for user-owned contracts
+ *
+ * We provide signature AND epected user as single bytes (the user is in the last 20 bytes)
+ * This can only be done based on a contract logic that always guarantees that the bytes have this layout (to prevent bad signatures)
+ * 
+ * This is illustrated in the `MarginSettler` contract where in `takeOrder`, we pass the correct calldata to the 1inch router.
+ */
 abstract contract ContractSigner is IERC1271 {
     function isValidSignature(
         bytes32 orderHash,
@@ -11,6 +22,7 @@ abstract contract ContractSigner is IERC1271 {
         return _isValidSignature(orderHash, signature);
     }
 
+    /// @notice this is executed when the 1inch router tries to validate the sig
     function _isValidSignature(
         bytes32 orderHash,
         bytes calldata signature
@@ -27,6 +39,7 @@ abstract contract ContractSigner is IERC1271 {
             r := calldataload(signature.offset)
             s := calldataload(add(signature.offset, 0x20))
             v := shr(248, calldataload(add(signature.offset, 0x40)))
+            // the signer is at the end
             signer := shr(96, calldataload(add(signature.offset, 65)))
         }
         address recoveredSigner = ECDSA.recover(orderHash, v, r, s);
@@ -36,6 +49,7 @@ abstract contract ContractSigner is IERC1271 {
         return 0xffffffff;
     }
 
+    /// @notice a simple utility function for testing
     function _recoverSigner(
         bytes32 orderHash,
         bytes memory signature

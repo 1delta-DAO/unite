@@ -4,6 +4,7 @@ pragma solidity ^0.8.30;
 
 import {ComposerCommands, LenderIds, LenderOps} from "../../src/composer/lib/enums/DeltaEnums.sol";
 
+/// @notice encode lending operations that are used in preInteractions
 library LendingEncoder {
     function encodeAaveBorrow(
         address asset,
