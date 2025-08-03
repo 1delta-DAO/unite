@@ -9,7 +9,6 @@ import {MakerTraits, MakerTraitsLib} from "@1inch/lo/libraries/MakerTraitsLib.so
 import {TakerTraits, TakerTraitsLib} from "@1inch/lo/libraries/TakerTraitsLib.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Address, AddressLib} from "@1inch/solidity-utils/contracts/libraries/AddressLib.sol";
-import {CalldataLib} from "../src/composer/utils/CalldataLib.sol";
 import {SweepType} from "../src/composer/lib/enums/MiscEnums.sol";
 
 // @solhint-ignore private-vars-leading-underscore
@@ -166,36 +165,6 @@ contract MarginSettlerTest is Test {
             });
     }
 
-    function _createSwapCalldata() internal view returns (bytes memory) {
-        // in taker interaction, we swap the maker token to taker token
-        bytes memory extCalldata = abi.encodeWithSelector(
-            0x414bf389, // exactInputSingle
-            abi.encode(
-                WETH,
-                USDC,
-                3000,
-                address(marginSettler),
-                block.timestamp + 1800,
-                1 * 1e18,
-                0,
-                0
-            )
-        );
-        extCalldata = CalldataLib.encodeExternalCall(
-            UNISWAP_V3_ROUTER,
-            0,
-            false,
-            extCalldata
-        );
-        extCalldata = CalldataLib.encodeExternalCall(
-            CALL_FORWARDER,
-            0,
-            false,
-            extCalldata
-        );
-        return extCalldata;
-    }
-
     function _createUnoSwapCalldata(
         address tokenIn,
         address tokenOut,
@@ -214,22 +183,6 @@ contract MarginSettlerTest is Test {
             0
         );
         return extCalldata;
-    }
-
-    function _createGetFlashloanCalldata()
-        internal
-        view
-        returns (bytes memory)
-    {
-        return
-            CalldataLib.encodeBalancerV2FlashLoan(
-                USDC,
-                uint8(0),
-                abi.encodePacked(
-                    CalldataLib.encodeAaveDeposit(USDC, user, AAVE_V3_POOL),
-                    CalldataLib.encodeAaveBorrow(WETH, user, 0, AAVE_V3_POOL)
-                )
-            );
     }
 
     function _createPreInteractionCalldata()

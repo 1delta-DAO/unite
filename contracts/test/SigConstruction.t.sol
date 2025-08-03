@@ -11,7 +11,6 @@ import {TakerTraits, TakerTraitsLib} from "@1inch/lo/libraries/TakerTraitsLib.so
 import {ExtensionLib} from "@1inch/lo/libraries/ExtensionLib.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Address, AddressLib} from "@1inch/solidity-utils/contracts/libraries/AddressLib.sol";
-import {CalldataLib} from "../src/composer/utils/CalldataLib.sol";
 import {SweepType} from "../src/composer/lib/enums/MiscEnums.sol";
 import {MarginSettlerTest} from "./MarginSettler.t.sol";
 import {LendingEncoder} from "./utils/LendingEncoder.sol";

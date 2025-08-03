@@ -21,7 +21,6 @@ import {ContractSigner} from "../signer/ContractSigner.sol";
 
 import {ComposerCommands} from "../composer/lib/enums/DeltaEnums.sol";
 import {Lending} from "../composer/lending/Lending.sol";
-import {UniversalFlashLoan} from "../composer/flashLoan/UniversalFlashLoan.sol";
 import {MorphoFlashLoanSimple} from "../composer/flashLoan/MorphoSimple.sol";
 import {ExternalCall} from "../composer/externalCall/ExternalCall.sol";
 import {Transfers} from "../composer/transfers/Transfers.sol";
@@ -30,24 +29,12 @@ import "../Errors.sol";
 
 type Offsets is uint256;
 
-/// @title OffsetsLib
-/// @dev A library for retrieving values by offsets from a concatenated calldata.
+/// @title OffsetsLib copied from 1inch for debugging
+/// @notice there is a validation missing in `sub(end, begin)` as undeflows whil cause invalidOOGOperand errors in forgeA
 library OffsetsLib {
     /// @dev Error to be thrown when the offset is out of bounds.
     error OffsetOutOfBounds();
 
-    /**
-     * @notice Retrieves the field value calldata corresponding to the provided field index from the concatenated calldata.
-     * @dev
-     * The function performs the following steps:
-     * 1. Retrieve the start and end of the segment corresponding to the provided index from the offsets array.
-     * 2. Get the value from segment using offset and length calculated based on the start and end of the segment.
-     * 3. Throw `OffsetOutOfBounds` error if the length of the segment is greater than the length of the concatenated data.
-     * @param offsets The offsets encoding the start and end of each segment within the concatenated calldata.
-     * @param concat The concatenated calldata.
-     * @param index The index of the segment to retrieve. The field index 0 corresponds to the lowest bytes of the offsets array.
-     * @return result The calldata from a segment of the concatenated calldata corresponding to the provided index.
-     */
     function get(
         Offsets offsets,
         bytes calldata concat,
@@ -78,7 +65,6 @@ contract MarginSettler is
     ContractSigner,
     Lending,
     MorphoFlashLoanSimple,
-    UniversalFlashLoan,
     ExternalCall,
     Transfers,
     Permits,
@@ -182,7 +168,7 @@ contract MarginSettler is
     uint256 internal constant _ORDER_STRUCT_SIZE = 0x100;
     uint256 internal constant _DATA_HASH_SIZE = 0x120;
 
-    bytes32 private constant TYPE_HASH =
+    bytes32 private constant _TYPE_HASH =
         keccak256(
             "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
         );
@@ -191,7 +177,7 @@ contract MarginSettler is
         return
             keccak256(
                 abi.encode(
-                    TYPE_HASH,
+                    _TYPE_HASH,
                     keccak256(bytes("1inch Aggregation Router")),
                     keccak256(bytes("6")),
                     block.chainid,
@@ -200,6 +186,7 @@ contract MarginSettler is
             );
     }
 
+    /// @notice we added this here to not have to manually create the hashes via libs/utils
     function hashOrder(
         IOrderMixin.Order calldata order
     ) external view returns (bytes32 result) {
@@ -217,15 +204,18 @@ contract MarginSettler is
         result = ECDSA.toTypedDataHash(domainSeparator, result);
     }
 
+    /// @notice preAction execute margin operations 
+    /// currently deposit/borrow, but anything is possible :)
+    /// as long as it sources funds from a lender after elevating the credit line
     function preInteraction(
-        IOrderMixin.Order calldata order,
+        IOrderMixin.Order calldata /* order */,
         bytes calldata extension,
-        bytes32 orderHash,
-        address taker,
+        bytes32 /* orderHash */,
+        address /* taker */,
         uint256 makingAmount,
         uint256 takingAmount,
-        uint256 remainingMakingAmount,
-        bytes calldata extraData
+        uint256 /* remainingMakingAmount */,
+        bytes calldata /* extraData */
     ) external override onlyLimitOrderProtocol {
         // user is at the beginning of the extension
         address user = _getUserFromExtension(extension);
@@ -290,12 +280,6 @@ contract MarginSettler is
                 );
             } else if (operation == ComposerCommands.PERMIT) {
                 currentOffset = _permit(currentOffset, callerAddress);
-            } else if (operation == ComposerCommands.FLASH_LOAN) {
-                currentOffset = _universalFlashLoan(
-                    currentOffset,
-                    callerAddress,
-                    makerAmount
-                );
             } else {
                 _invalidOperation();
             }
@@ -306,14 +290,15 @@ contract MarginSettler is
         if (currentOffset > maxIndex) revert InvalidCalldata();
     }
 
+    /** allow takers to use swaps (currently only uniswap v3) */
     function takerInteraction(
         IOrderMixin.Order calldata order,
-        bytes calldata action,
-        bytes32 orderHash,
-        address taker,
-        uint256 makingAmount,
-        uint256 takingAmount,
-        uint256 remainingMakingAmount,
+        bytes calldata /* action */,
+        bytes32 /* orderHash */,
+        address /* taker */,
+        uint256 /* makingAmount */,
+        uint256 /* takingAmount */,
+        uint256 /* remainingMakingAmount */,
         bytes calldata extraData
     ) external override onlyLimitOrderProtocol {
         IERC20(order.makerAsset.get()).approve(_ROUTER, type(uint).max);
@@ -321,19 +306,17 @@ contract MarginSettler is
         require(success, "Taker Swap Action failed");
     }
 
+    /** post interaction for e.g. trigger validation */
     function postInteraction(
-        IOrderMixin.Order calldata order,
-        bytes calldata extension,
-        bytes32 orderHash,
-        address taker,
-        uint256 makingAmount,
-        uint256 takingAmount,
-        uint256 remainingMakingAmount,
-        bytes calldata extraData
+        IOrderMixin.Order calldata /* order */,
+        bytes calldata /* extension */,
+        bytes32 /* orderHash */,
+        address /* taker */,
+        uint256 /* makingAmount */,
+        uint256 /* takingAmount */,
+        uint256 /* remainingMakingAmount */,
+        bytes calldata /* extraData */
     ) external override onlyLimitOrderProtocol {
-        address user = order.receiver.get();
-        // The lending operations map taker and maker amount as makerAmount: inputAmount, takerAmount: outputAmount
-        // _batchExecuteSignedOp(user, takingAmount, makingAmount, extraData);
         return;
     }
 
@@ -382,12 +365,13 @@ contract MarginSettler is
             );
     }
 
+    /** Flash-loan the asset for enabling the filling of a margin order */
     function flashLoanFill(
         address asset,
         uint256 amount,
         bytes calldata params
     ) external {
-        morphoFlashLoanSimple(asset, amount, params);
+        _morphoFlashLoanSimple(asset, amount, params);
     }
 
     /// @dev Morpho Blue flash loan callback
@@ -431,6 +415,7 @@ contract MarginSettler is
         IERC20(order.takerAsset.get()).approve(msg.sender, type(uint256).max);
     }
     /**
+    Copied from 1inch repo for validation purposes
      * @notice Processes the taker interaction arguments.
      * @param takerTraits The taker preferences for the order.
      * @param args The taker interaction arguments.
@@ -442,7 +427,7 @@ contract MarginSettler is
         TakerTraits takerTraits,
         bytes calldata args
     )
-        public
+        internal
         view
         returns (
             address target,

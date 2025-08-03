@@ -74,38 +74,40 @@ abstract contract Lending is
                     _morphoBorrow(currentOffset, callerAddress, makerAmount);
             }
         }
+        // the other operations are not yet impleemnted 
         /**
          * Repay
          */
-        else if (lendingOperation == LenderOps.REPAY) {
-            if (lender < LenderIds.UP_TO_AAVE_V2) {
-                return _repayToAave(currentOffset, callerAddress);
-            } else if (lender < LenderIds.UP_TO_COMPOUND_V3) {
-                return _repayToCompoundV3(currentOffset);
-            } else if (lender < LenderIds.UP_TO_COMPOUND_V2) {
-                return _repayToCompoundV2(currentOffset);
-            } else {
-                return _morphoRepay(currentOffset, callerAddress);
-            }
-        }
-        /**
-         * Withdraw collateral
-         */
-        else if (lendingOperation == LenderOps.WITHDRAW) {
-            if (lender < LenderIds.UP_TO_AAVE_V2) {
-                return _withdrawFromAave(currentOffset, callerAddress);
-            } else if (lender < LenderIds.UP_TO_COMPOUND_V3) {
-                return _withdrawFromCompoundV3(currentOffset, callerAddress);
-            } else if (lender < LenderIds.UP_TO_COMPOUND_V2) {
-                return _withdrawFromCompoundV2(currentOffset, callerAddress);
-            } else {
-                return
-                    _encodeMorphoWithdrawCollateral(
-                        currentOffset,
-                        callerAddress
-                    );
-            }
-        } else {
+        // else if (lendingOperation == LenderOps.REPAY) {
+        //     if (lender < LenderIds.UP_TO_AAVE_V2) {
+        //         return _repayToAave(currentOffset, callerAddress);
+        //     } else if (lender < LenderIds.UP_TO_COMPOUND_V3) {
+        //         return _repayToCompoundV3(currentOffset);
+        //     } else if (lender < LenderIds.UP_TO_COMPOUND_V2) {
+        //         return _repayToCompoundV2(currentOffset);
+        //     } else {
+        //         return _morphoRepay(currentOffset, callerAddress);
+        //     }
+        // }
+        // /**
+        //  * Withdraw collateral
+        //  */
+        // else if (lendingOperation == LenderOps.WITHDRAW) {
+        //     if (lender < LenderIds.UP_TO_AAVE_V2) {
+        //         return _withdrawFromAave(currentOffset, callerAddress);
+        //     } else if (lender < LenderIds.UP_TO_COMPOUND_V3) {
+        //         return _withdrawFromCompoundV3(currentOffset, callerAddress);
+        //     } else if (lender < LenderIds.UP_TO_COMPOUND_V2) {
+        //         return _withdrawFromCompoundV2(currentOffset, callerAddress);
+        //     } else {
+        //         return
+        //             _encodeMorphoWithdrawCollateral(
+        //                 currentOffset,
+        //                 callerAddress
+        //             );
+        //     }
+        // }
+         else {
             _invalidOperation();
         }
     }

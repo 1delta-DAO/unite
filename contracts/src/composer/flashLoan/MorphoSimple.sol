@@ -9,7 +9,7 @@ import {Masks} from "../lib/masks/Masks.sol";
  * @author 1delta Labs AG
  */
 contract MorphoFlashLoanSimple is Masks {
-        address private constant MORPHO_BLUE =
+        address private constant _MORPHO_BLUE =
         0x6c247b1F6182318877311737BaC0844bAa518F5e;
 
     /*
@@ -20,7 +20,7 @@ contract MorphoFlashLoanSimple is Masks {
      * | 40     | 2              | paramsLength                    |
      * | 42     | paramsLength   | params                          |
      */
-    function morphoFlashLoanSimple(
+    function _morphoFlashLoanSimple(
         address token,
         uint256 amount,
         bytes calldata params
@@ -51,7 +51,7 @@ contract MorphoFlashLoanSimple is Masks {
             if iszero(
                 call(
                     gas(),
-                    MORPHO_BLUE,
+                    _MORPHO_BLUE,
                     0x0,
                     ptr,
                     add(calldataLength, 132),
