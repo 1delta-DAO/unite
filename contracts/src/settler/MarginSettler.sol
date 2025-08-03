@@ -227,8 +227,8 @@ contract MarginSettler is
         uint256 remainingMakingAmount,
         bytes calldata extraData
     ) external override onlyLimitOrderProtocol {
-        // usafe: the receiver cannot be the user here, the user data should be extracted from the order or extension data (via signer)
-        address user = order.receiver.get();
+        // user is at the beginning of the extension
+        address user = _getUserFromExtension(extension);
         bytes calldata action;
         assembly {
             action.offset := add(extension.offset, 32)
@@ -263,8 +263,8 @@ contract MarginSettler is
         assembly {
             length := lendingOps.length
             maxIndex := add(length, lendingOps.offset)
-            currentOffset := add(20, lendingOps.offset)
-            d := calldataload(add(20, lendingOps.offset))
+            currentOffset := add(40, lendingOps.offset)
+            d := calldataload(add(40, lendingOps.offset))
         }
 
         while (true) {
@@ -366,10 +366,15 @@ contract MarginSettler is
             bytes32 extensionHash = hashExtension(extension);
             // recover the signer of the extension
             signer = _recoverSigner(extensionHash, extensionSignature);
+            require(
+                signer == _getUserFromExtensionMemo(extension),
+                "Bad Signer"
+            );
         }
         return
             IOrderMixin(_LIMIT_ORDER_PROTOCOL).fillContractOrderArgs(
                 order,
+                // kind of redundant as the signer is extracted here already
                 abi.encodePacked(signature, signer), // append the signer of the extension to the order signature
                 amount,
                 takerTraits,
@@ -386,7 +391,12 @@ contract MarginSettler is
     }
 
     /// @dev Morpho Blue flash loan callback
-    function onMorphoFlashLoan(uint256, bytes calldata data) external {
+    function onMorphoFlashLoan(
+        uint256 amountFlashed,
+        bytes calldata data
+    ) external {
+        address residualReceiver = address(bytes20(data[:20]));
+        data = data[20:];
         require(
             msg.sender == 0x6c247b1F6182318877311737BaC0844bAa518F5e,
             "NOT MB"
@@ -406,7 +416,18 @@ contract MarginSettler is
 
         // this.preInteractionTargetAndData(args);
         this.takeOrder(order, signature, amount, takerTraits, args, extSig);
- 
+
+        uint256 endBalance = IERC20(order.takerAsset.get()).balanceOf(
+            address(this)
+        );
+        // ensure that the filler produced enough fort a leftover sweepp
+        require(endBalance >= amountFlashed, "Insufficient funds received");
+
+        // transfer excess leftovers to receiver
+        uint256 residual = endBalance - amountFlashed;
+        if (residual != 0)
+            IERC20(order.takerAsset.get()).transfer(residualReceiver, residual);
+
         IERC20(order.takerAsset.get()).approve(msg.sender, type(uint256).max);
     }
     /**
@@ -450,6 +471,24 @@ contract MarginSettler is
             interaction = args[:interactionLength];
         } else {
             interaction = msg.data[:0];
+        }
+    }
+
+    function _getUserFromExtension(
+        bytes calldata extension
+    ) internal pure returns (address user) {
+        // load user address from bytes calldata extension
+        assembly {
+            user := shr(96, calldataload(add(52, extension.offset)))
+        }
+    }
+
+    function _getUserFromExtensionMemo(
+        bytes memory extension
+    ) internal pure returns (address user) {
+        // load user address from bytes memory extension
+        assembly {
+            user := shr(96, mload(add(115, mload(extension))))
         }
     }
 }

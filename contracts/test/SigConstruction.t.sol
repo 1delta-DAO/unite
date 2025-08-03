@@ -48,8 +48,13 @@ contract SigConstructionTest is MarginSettlerTest {
         uint256 signerPrivateKey = wallet.privateKey;
         address signerAddress = wallet.addr;
 
+        wallet = vm.createWallet("filler");
+        address fillerAddress = wallet.addr;
+
+        vm.label(signerAddress, "signerAddress");
+        vm.label(fillerAddress, "fillerAddress");
+
         IOrderMixin.Order memory order = _createOrder();
-        order.receiver = Address.wrap(uint256(uint160(signerAddress)));
 
         // the calldata follows this pattern
         // enum DynamicField {
@@ -65,33 +70,23 @@ contract SigConstructionTest is MarginSettlerTest {
         // }
 
         bytes memory extensionCalldata = abi.encodePacked(
-            // zero, // MakerAssetSuffix
-            // zero, // TakerAssetSuffix
-            // zero, // MakingAmountData
-            // zero, // TakingAmountData
-            // zero, // Predicate (makerPermit is 0x)
-            address(marginSettler), // PreInteractionData
-            createOpen(USDC, WETH, AAVE_V3_POOL)
+            address(marginSettler), // call target in first 20 bytes
+            address(signerAddress), // signer in second 20 bytes
+            createOpen(USDC, WETH, AAVE_V3_POOL) // calldata start
         );
         {
             bytes memory offsets = abi.encodePacked(
-                uint32(0), // start MakerAssetSuffix 0 * 32
-                uint32(0), // start TakerAssetSuffix
-                uint32(0), // start MakingAmountData
-                uint32(0), // start TakingAmountData
-                uint32(0), // start Predicate
-                uint32(extensionCalldata.length), // start MakerPermit
-                uint32(extensionCalldata.length), // start PreInteractionData // 7*32
-                uint32(0) // start PostInteractionData // 8*32
+                uint32(0), // cumulative length MakerAssetSuffix 0 * 32
+                uint32(0), // cumulative length TakerAssetSuffix
+                uint32(0), // cumulative length MakingAmountData
+                uint32(0), // cumulative length TakingAmountData
+                uint32(0), // cumulative length Predicate
+                uint32(extensionCalldata.length), // cumulative length MakerPermit
+                uint32(extensionCalldata.length), // cumulative length PreInteractionData // 7*32
+                uint32(0) // cumulative length PostInteractionData // 8*32
             );
-
-            console.log("--- offsets");
-            console.logBytes(offsets);
             // the data needs to be abi coded with offset and length
             extensionCalldata = abi.encodePacked(offsets, extensionCalldata);
-            console.logBytes(
-                marginSettler.preInteractionTargetAndData(extensionCalldata)
-            );
         }
         console.logBytes(extensionCalldata);
 
@@ -116,54 +111,15 @@ contract SigConstructionTest is MarginSettlerTest {
         (v, r, s) = vm.sign(signerPrivateKey, orderHash);
         bytes memory orderSignature = abi.encodePacked(r, s, v);
 
-        console.log("extensionSignature", extensionSignature.length);
-        console.log("signerAddress", signerAddress);
-        console.log("orderHash");
-        console.logBytes32(orderHash);
-        console.logBytes(extensionCalldata);
-
-        console.log("-------");
-        console.logBytes32(bytes32(type(uint160).max & uint256(extensionHash)));
-        console.logBytes32(bytes32(order.salt));
-        console.logBytes32(extensionHash);
-        console.log(
-            "uint256(keccak256(extension)) & type(uint160).max != order.salt & type(uint160).max",
-            uint256(keccak256(extensionCalldata)) & type(uint160).max !=
-                order.salt & type(uint160).max
-        );
-        console.log("-------");
-        // {
-        //         TakerTraits takerTraits = _createTakerTraits(extensionCalldata.length, 0);
-        // console.log(TakerTraitsLib.usePermit2(takerTraits));
-        // }
-        // test calls
-        // {
-        //     (, bytes memory a, bytes memory b) = marginSettler._parseArgs(
-        //         _createTakerTraits(extensionCalldata.length, 0),
-        //         extensionCalldata
-        //     );
-        //     console.logBytes(b);
-
-        //     console.logBytes(marginSettler.takerAssetSuffix(a));
-        // }
-        // marginSettler.preInteractionTargetAndData(a);
-        // console.logBytes(extensionCalldata);
-        // vm.expectRevert(0x398d4d32);
-        // marginSettler.takeOrder(
-        //     order,
-        //     orderSignature,
-        //     order.takingAmount,
-        //     takerTraits,
-        //     extensionCalldata
-        // );
-
         // approve pool
         vm.prank(signerAddress);
         IERC20(WETH).approve(AAVE_V3_POOL, type(uint).max);
 
+        uint256 initialMargin = 0.1e18;
+
         // deposit margin
         vm.prank(signerAddress);
-        IDelegation(AAVE_V3_POOL).supply(WETH, 0.1e18, signerAddress, 0);
+        IDelegation(AAVE_V3_POOL).supply(WETH, initialMargin, signerAddress, 0);
 
         // approve borrowing
         vm.prank(signerAddress);
@@ -173,7 +129,6 @@ contract SigConstructionTest is MarginSettlerTest {
         );
 
         {
-
             // create taker actio n to fill with router
             bytes memory swapCalldata = _createUnoSwapCalldata(
                 AddressLib.get(order.makerAsset),
@@ -182,7 +137,10 @@ contract SigConstructionTest is MarginSettlerTest {
             );
 
             // attach target
-            swapCalldata = abi.encodePacked(address(marginSettler), swapCalldata);
+            swapCalldata = abi.encodePacked(
+                address(marginSettler),
+                swapCalldata
+            );
 
             // create calldata for flash
             swapCalldata = abi.encode(
@@ -196,13 +154,31 @@ contract SigConstructionTest is MarginSettlerTest {
                 abi.encodePacked(extensionCalldata, swapCalldata),
                 extensionSignature
             );
-
+            vm.prank(fillerAddress);
             // fill
             marginSettler.flashLoanFill(
                 AddressLib.get(order.takerAsset),
                 order.takingAmount,
-                swapCalldata
+                abi.encodePacked(fillerAddress, swapCalldata)
             );
         }
+
+        uint256 collateralUser = IERC20(AAVE_V3_WETH_COLLATERAL).balanceOf(
+            signerAddress
+        );
+        uint256 debtUser = IERC20(AAVE_V3_USDC_DEBT).balanceOf(signerAddress);
+
+        // asert that the user holds
+        // - the takingAmount plus initial margin in collateral
+        assertApproxEqRel(
+            collateralUser,
+            order.takingAmount + initialMargin,
+            0.00000001e18
+        );
+
+        // - the makingAmount in debt
+        assertApproxEqRel(debtUser, order.makingAmount, 0.00000001e18);
+
+        // the asserts expect deviations due to rebasing of debt and collateral tokens
     }
 }

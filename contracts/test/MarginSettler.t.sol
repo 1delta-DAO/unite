@@ -26,8 +26,11 @@ contract MarginSettlerTest is Test {
     address constant AAVE_V3_WETH = 0xe50fA9b3c56FfB159cB0FCA61F5c9D750e8128c8;
     address constant AAVE_v3_WETH_DEBT =
         0x0c84331e39d6658Cd6e6b9ba04736cC4c4734351;
+    address constant AAVE_V3_WETH_COLLATERAL =
+        0xe50fA9b3c56FfB159cB0FCA61F5c9D750e8128c8;
     address constant AAVE_V3_USDC = 0x625E7708f30cA75bfd92586e17077590C60eb4cD;
-    address constant AAVE_V3_USDC_DEBT = 0xf611aEb5013fD2c0511c9CD55c7dc5C1140741A6;
+    address constant AAVE_V3_USDC_DEBT =
+        0xf611aEb5013fD2c0511c9CD55c7dc5C1140741A6;
     address constant CALL_FORWARDER =
         0xfCa1154C643C32638AEe9a43eeE7f377f515c801;
     address constant UNISWAP_V3_FACTORY =
@@ -46,7 +49,10 @@ contract MarginSettlerTest is Test {
         user = userWallet.addr;
         userPrivateKey = userWallet.privateKey;
 
-        marginSettler = new MarginSettler(LIMIT_ORDER_PROTOCOL, UNISWAP_V3_ROUTER);
+        marginSettler = new MarginSettler(
+            LIMIT_ORDER_PROTOCOL,
+            UNISWAP_V3_ROUTER
+        );
 
         vm.label(user, "user");
         vm.label(address(marginSettler), "marginSettler");
@@ -117,8 +123,7 @@ contract MarginSettlerTest is Test {
             ) <<
             120;
 
-
-         // expiry
+        // expiry
         // traits |=
         //     uint256(
         //         uint40(1)
@@ -140,7 +145,7 @@ contract MarginSettlerTest is Test {
         // ARGS_INTERACTION_LENGTH
         traits |= (interactionLength << 200);
 
-        tt =  TakerTraits.wrap(traits);
+        tt = TakerTraits.wrap(traits);
 
         return tt;
     }
@@ -150,7 +155,9 @@ contract MarginSettlerTest is Test {
             IOrderMixin.Order({
                 salt: uint256(keccak256("testSalt")),
                 maker: Address.wrap(uint256(uint160(address(marginSettler)))),
-                receiver: Address.wrap(uint256(uint160(user))),
+                receiver: Address.wrap(
+                    uint256(uint160(address(marginSettler)))
+                ),
                 takerAsset: Address.wrap(uint256(uint160(WETH))),
                 makerAsset: Address.wrap(uint256(uint160(USDC))),
                 takingAmount: 0.1e18,
@@ -189,23 +196,25 @@ contract MarginSettlerTest is Test {
         return extCalldata;
     }
 
-
-    function _createUnoSwapCalldata(address tokenIn, address tokenOut, uint256 amount) internal view returns (bytes memory) {
+    function _createUnoSwapCalldata(
+        address tokenIn,
+        address tokenOut,
+        uint256 amount
+    ) internal view returns (bytes memory) {
         // in taker interaction, we swap the maker token to taker token
         bytes memory extCalldata = abi.encodeWithSelector(
             0x414bf389, // exactInputSingle
-                tokenIn,
-                tokenOut,
-                3000,
-                address(marginSettler),
-                type(uint).max,
-                amount,
-                0,
-                0
+            tokenIn,
+            tokenOut,
+            3000,
+            address(marginSettler),
+            type(uint).max,
+            amount,
+            0,
+            0
         );
         return extCalldata;
     }
-
 
     function _createGetFlashloanCalldata()
         internal
