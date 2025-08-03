@@ -11,7 +11,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Address, AddressLib} from "@1inch/solidity-utils/contracts/libraries/AddressLib.sol";
 import {SweepType} from "../src/composer/lib/enums/MiscEnums.sol";
 
-// @solhint-ignore private-vars-leading-underscore
+// @solhint-disable private-vars-leading-underscore
 
 contract MarginSettlerTest is Test {
     bytes32 constant DOMAIN_SEPARATOR =
@@ -43,6 +43,14 @@ contract MarginSettlerTest is Test {
     address public user;
     uint256 public userPrivateKey;
 
+    struct UserOrderDefinition {
+        address borrowAsset;
+        address collateralAsset;
+        uint256 initialMargin;
+        uint256 borrowAmount;
+        uint256 depositAmount;
+    }
+
     function setUp() public {
         VmSafe.Wallet memory userWallet = vm.createWallet("user");
         user = userWallet.addr;
@@ -67,40 +75,6 @@ contract MarginSettlerTest is Test {
         vm.label(UNISWAP_V3_QUOTER, "uniswapV3Quoter");
 
         vm.createSelectFork("wss://arbitrum-one-rpc.publicnode.com");
-    }
-
-    function testOrder() public {
-        IOrderMixin.Order memory order = _createOrder();
-        // sign the order
-        bytes32 orderHash = IOrderMixin(LIMIT_ORDER_PROTOCOL).hashOrder(order);
-
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPrivateKey, orderHash);
-
-        bytes memory signature = abi.encodePacked(r, s, v);
-
-        // populate args
-        bytes memory args;
-
-        // calldata
-
-        bytes memory preInteractionCalldata = _createPreInteractionCalldata();
-        bytes
-            memory takerInteractionCalldata = _createTakerInteractionCalldata();
-        bytes memory postInteractionCalldata = _createPostInteractionCalldata();
-
-        bytes memory extensionCalldata;
-
-        marginSettler.takeOrder(
-            order,
-            signature,
-            3500 * 1e6,
-            _createTakerTraits(
-                extensionCalldata.length,
-                takerInteractionCalldata.length
-            ),
-            abi.encodePacked(extensionCalldata, takerInteractionCalldata),
-            hex""
-        );
     }
 
     function _createMakerTraits() internal view returns (MakerTraits) {
@@ -135,7 +109,7 @@ contract MarginSettlerTest is Test {
     function _createTakerTraits(
         uint256 extensionLength,
         uint256 interactionLength
-    ) internal view returns (TakerTraits tt) {
+    ) internal pure returns (TakerTraits tt) {
         uint256 traits = 0;
 
         // ARGS_EXTENSION_LENGTH
@@ -149,7 +123,9 @@ contract MarginSettlerTest is Test {
         return tt;
     }
 
-    function _createOrder() internal view returns (IOrderMixin.Order memory) {
+    function _createOrder(
+        UserOrderDefinition memory def
+    ) internal view returns (IOrderMixin.Order memory) {
         return
             IOrderMixin.Order({
                 salt: uint256(keccak256("testSalt")),
@@ -157,10 +133,10 @@ contract MarginSettlerTest is Test {
                 receiver: Address.wrap(
                     uint256(uint160(address(marginSettler)))
                 ),
-                takerAsset: Address.wrap(uint256(uint160(WETH))),
-                makerAsset: Address.wrap(uint256(uint160(USDC))),
-                takingAmount: 0.1e18,
-                makingAmount: 360.0e6,
+                takerAsset: Address.wrap(uint256(uint160(def.collateralAsset))),
+                makerAsset: Address.wrap(uint256(uint160(def.borrowAsset))),
+                takingAmount: def.depositAmount,
+                makingAmount: def.borrowAmount,
                 makerTraits: _createMakerTraits()
             });
     }
@@ -184,38 +160,4 @@ contract MarginSettlerTest is Test {
         );
         return extCalldata;
     }
-
-    function _createPreInteractionCalldata()
-        internal
-        view
-        returns (bytes memory)
-    {
-        // TODO
-        return "";
-    }
-
-    function _createTakerInteractionCalldata()
-        internal
-        view
-        returns (bytes memory)
-    {
-        // TODO
-        return "";
-    }
-
-    function _createPostInteractionCalldata()
-        internal
-        view
-        returns (bytes memory)
-    {
-        // TODO
-        return "";
-    }
-
-    function _createExtensionCalldata() internal view returns (bytes memory) {
-        // TODO
-        return "";
-    }
-
-    // abi.encodeWithSelector(0xc04a8a10, abi.encode(address(marginSettler, type(uint256).max)));
 }
