@@ -140,8 +140,20 @@ export class MarginService {
                 salt: LimitOrder.buildSalt(extension, baseSalt), // Proper salt generation
             }
 
+            // Create maker traits with allowed sender restriction (only our relayer can fill)
+            const relayerAddress = process.env.NEXT_PUBLIC_RELAYER_ADDRESS || process.env.RELAYER_ADDRESS
+            let makerTraits = MakerTraits.default()
+
+            // Set HAS_EXTENSION_FLAG since we have extension calldata
+            makerTraits = makerTraits.withExtension()
+
+            // Restrict to our relayer only if configured
+            if (relayerAddress && relayerAddress !== "0x0000000000000000000000000000000000000000") {
+                makerTraits = makerTraits.withAllowedSender(new Address(relayerAddress))
+            }
+
             // Create and sign the order with extension
-            const order = new LimitOrder(orderInfo, MakerTraits.default(), extension)
+            const order = new LimitOrder(orderInfo, makerTraits, extension)
             const orderHash = order.getTypedData(42161)
 
             // Sign the order

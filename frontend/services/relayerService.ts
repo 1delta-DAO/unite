@@ -2,10 +2,11 @@ import { ethers } from "ethers"
 import { handleError, MarginTradingError, ErrorCodes } from "@/utils/errorHandling"
 import { OrderResult } from "./marginService"
 import { SwapService } from "./swapService"
+import { OrderMonitor, OrderStatus as MonitorOrderStatus } from "./orderMonitor"
 
 // Relayer configuration
-const RELAYER_API_URL = "https://api.example-relayer.com" // todo
-const MARGIN_SETTLER_ADDRESS = "0x0000000000000000000000000000000000000000" // TODO
+const RELAYER_API_URL = process.env.RELAYER_API_URL || "http://localhost:3000/api"
+const MARGIN_SETTLER_ADDRESS = process.env.NEXT_PUBLIC_MARGIN_SETTLER_ADDRESS || "0x0000000000000000000000000000000000000000"
 
 export interface RelayerQuote {
     fillPrice: string
@@ -39,9 +40,11 @@ export class RelayerService {
     private provider: ethers.BrowserProvider | null = null
     private swapService: SwapService
     private marginSettlerContract: ethers.Contract | null = null
+    private orderMonitor: OrderMonitor
 
     constructor() {
         this.swapService = new SwapService()
+        this.orderMonitor = new OrderMonitor()
         this.initializeProvider()
     }
 
@@ -67,35 +70,24 @@ export class RelayerService {
         try {
             const orderInfo = orderResult.orderInfo
 
-            // Create swap route for the fill
-            const swapCalldata = this.swapService.createSwapRouting(
-                orderInfo.takerAsset?.toString() || "0x0000000000000000000000000000000000000000", // WETH
-                orderInfo.makerAsset?.toString() || "0x0000000000000000000000000000000000000000", // USDC
-                orderInfo.takingAmount?.toString() || "0",
-                MARGIN_SETTLER_ADDRESS
-            )
+            // For now, provide a simple quote calculation
+            // In production, this could call external pricing APIs
+            const makingAmount = parseFloat(ethers.formatUnits(orderInfo.makingAmount?.toString() || "0", 6)) // USDC
+            const takingAmount = parseFloat(ethers.formatUnits(orderInfo.takingAmount?.toString() || "0", 18)) // WETH
 
-            // In a real implementation, this would call the relayer API
-            const requestBody = {
-                order: {
-                    salt: orderInfo.salt?.toString() || "0",
-                    maker: orderInfo.maker?.toString() || "0x0000000000000000000000000000000000000000",
-                    receiver: orderInfo.receiver?.toString() || "0x0000000000000000000000000000000000000000",
-                    makerAsset: orderInfo.makerAsset?.toString() || "0x0000000000000000000000000000000000000000",
-                    takerAsset: orderInfo.takerAsset?.toString() || "0x0000000000000000000000000000000000000000",
-                    makingAmount: orderInfo.makingAmount?.toString() || "0",
-                    takingAmount: orderInfo.takingAmount?.toString() || "0",
-                    makerTraits: "0", // Default value
-                },
-                orderSignature: orderResult.orderSignature,
-                extensionCalldata: orderResult.extensionCalldata,
-                extensionSignature: orderResult.extensionSignature,
-                swapCalldata: swapCalldata,
+            // Simulate price calculation with slippage
+            const basePrice = makingAmount / takingAmount
+            const slippage = 0.5 // 0.5%
+            const fillPrice = basePrice * (1 - slippage / 100)
+
+            return {
+                fillPrice: fillPrice.toFixed(2),
+                estimatedGas: "300000",
+                estimatedTime: "30",
+                relayerFee: (makingAmount * 0.001).toFixed(2), // 0.1% fee
+                slippage: slippage.toString(),
+                success: true,
             }
-
-            // Simulate relayer API call
-            const quote = await this.simulateRelayerQuote(requestBody)
-            return quote
         } catch (error) {
             throw handleError(error, "getting relayer quote")
         }
@@ -113,9 +105,15 @@ export class RelayerService {
                 throw new MarginTradingError(quote.errorMessage || "Relayer rejected the order", ErrorCodes.FLASH_LOAN_FAILED)
             }
 
-            // Submit to relayer
-            const submission = await this.submitOrderToRelayer(orderResult, quote)
-            return submission
+            // Submit to backend relayer
+            const { orderId, trackingId } = await this.orderMonitor.submitOrder(orderResult)
+
+            return {
+                transactionHash: "", // Will be filled when order is executed
+                relayerAddress: process.env.NEXT_PUBLIC_RELAYER_ADDRESS || "0x0000000000000000000000000000000000000000",
+                estimatedConfirmation: (Date.now() + 30000).toString(), // 30 seconds from now
+                trackingId: trackingId,
+            }
         } catch (error) {
             throw handleError(error, "submitting order to relayer")
         }
@@ -192,9 +190,38 @@ export class RelayerService {
      */
     async getOrderStatus(trackingId: string): Promise<OrderStatus> {
         try {
-            // In a real implementation, this would query the relayer API or blockchain
-            const status = await this.simulateOrderStatus(trackingId)
-            return status
+            const orderStatus = await this.orderMonitor.getOrderStatus(trackingId)
+
+            // Map status values between the interfaces
+            let mappedStatus: OrderStatus["status"]
+            switch (orderStatus.status) {
+                case "pending":
+                    mappedStatus = "pending"
+                    break
+                case "filling":
+                    mappedStatus = "executing"
+                    break
+                case "filled":
+                    mappedStatus = "completed"
+                    break
+                case "failed":
+                    mappedStatus = "failed"
+                    break
+                case "cancelled":
+                    mappedStatus = "cancelled"
+                    break
+            }
+
+            return {
+                status: mappedStatus,
+                transactionHash: orderStatus.txHash,
+                blockNumber: undefined, // Will be extracted from transaction receipt if needed
+                executedAt: orderStatus.filledAt ? new Date(orderStatus.filledAt) : undefined,
+                failureReason: orderStatus.errorMessage,
+                gasUsed: undefined, // Can be added later
+                effectivePrice: undefined, // Can be calculated from transaction
+                relayerFee: undefined, // Can be calculated
+            }
         } catch (error) {
             throw handleError(error, "getting order status")
         }
@@ -205,12 +232,7 @@ export class RelayerService {
      */
     async cancelOrder(trackingId: string): Promise<boolean> {
         try {
-            // In a real implementation, this would call the relayer API
-            console.log("Cancelling order:", trackingId)
-
-            // Simulate cancellation
-            await new Promise((resolve) => setTimeout(resolve, 1000))
-            return true
+            return await this.orderMonitor.cancelOrder(trackingId)
         } catch (error) {
             throw handleError(error, "cancelling order")
         }
@@ -230,105 +252,24 @@ export class RelayerService {
         }[]
     > {
         try {
-            // In a real implementation, this would query the relayer registry
+            // Get statistics from backend
+            const stats = await this.orderMonitor.getStatistics()
+            const totalOrders = stats.filled + stats.failed
+            const successRate = totalOrders > 0 ? ((stats.filled / totalOrders) * 100).toFixed(1) : "0.0"
+
+            // Return our own relayer info
             return [
                 {
-                    address: "0x1234567890123456789012345678901234567890",
-                    name: "FastFill Relayer",
-                    successRate: "99.2%",
+                    address: process.env.NEXT_PUBLIC_RELAYER_ADDRESS || "0x0000000000000000000000000000000000000000",
+                    name: "Unite Protocol Relayer",
+                    successRate: `${successRate}%`,
                     averageTime: "30s",
                     feeRate: "0.1%",
-                    isActive: true,
-                },
-                {
-                    address: "0x2345678901234567890123456789012345678901",
-                    name: "CheapGas Relayer",
-                    successRate: "97.8%",
-                    averageTime: "45s",
-                    feeRate: "0.05%",
                     isActive: true,
                 },
             ]
         } catch (error) {
             throw handleError(error, "getting available relayers")
-        }
-    }
-
-    // Simulation methods (replace with actual API calls in production)
-    private async simulateRelayerQuote(requestBody: any): Promise<RelayerQuote> {
-        // Simulate network delay
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-
-        const order = requestBody.order
-        const makingAmount = parseFloat(ethers.formatUnits(order.makingAmount, 6)) // USDC
-        const takingAmount = parseFloat(ethers.formatUnits(order.takingAmount, 18)) // WETH
-
-        // Simulate price calculation with slippage
-        const basePrice = makingAmount / takingAmount
-        const slippage = 0.5 // 0.5%
-        const fillPrice = basePrice * (1 - slippage / 100)
-
-        return {
-            fillPrice: fillPrice.toFixed(2),
-            estimatedGas: "300000",
-            estimatedTime: "30",
-            relayerFee: (makingAmount * 0.001).toFixed(2), // 0.1% fee
-            slippage: slippage.toString(),
-            success: true,
-        }
-    }
-
-    private async submitOrderToRelayer(orderResult: OrderResult, quote: RelayerQuote): Promise<RelayerSubmission> {
-        // Simulate network delay
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-
-        return {
-            transactionHash:
-                "0x" +
-                Array(64)
-                    .fill(0)
-                    .map(() => Math.floor(Math.random() * 16).toString(16))
-                    .join(""),
-            relayerAddress: "0x1234567890123456789012345678901234567890",
-            estimatedConfirmation: (Date.now() + 30000).toString(), // 30 seconds from now
-            trackingId: "track_" + Math.random().toString(36).substr(2, 9),
-        }
-    }
-
-    private async simulateOrderStatus(trackingId: string): Promise<OrderStatus> {
-        // Simulate different status based on tracking ID
-        const statuses: OrderStatus["status"][] = ["pending", "executing", "completed", "failed"]
-        const randomStatus = statuses[Math.floor(Math.random() * statuses.length)]
-
-        const baseStatus: OrderStatus = {
-            status: randomStatus,
-        }
-
-        switch (randomStatus) {
-            case "completed":
-                return {
-                    ...baseStatus,
-                    transactionHash:
-                        "0x" +
-                        Array(64)
-                            .fill(0)
-                            .map(() => Math.floor(Math.random() * 16).toString(16))
-                            .join(""),
-                    blockNumber: 12345678,
-                    executedAt: new Date(),
-                    gasUsed: "285432",
-                    effectivePrice: "1850.45",
-                    relayerFee: "1.25",
-                }
-
-            case "failed":
-                return {
-                    ...baseStatus,
-                    failureReason: "Insufficient liquidity for swap",
-                }
-
-            default:
-                return baseStatus
         }
     }
 }
