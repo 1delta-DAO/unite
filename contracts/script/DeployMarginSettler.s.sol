@@ -7,8 +7,7 @@ import {MarginSettler} from "../src/settler/MarginSettler.sol";
 contract DeployMarginSettler is Script {
     // Arbitrum addresses
     address constant LIMIT_ORDER_PROTOCOL =
-        0x54431918cEC22932fCF208e2EaaF1339B3628177;
-    address constant AAVE_V3_POOL = 0x794a61358D6845594F94dc1DB02A252b5b4814aD;
+        0x111111125421cA6dc452d289314280a0f8842A65;
     address constant UNISWAP_V3_ROUTER =
         0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
@@ -24,7 +23,6 @@ contract DeployMarginSettler is Script {
         // Deploy MarginSettler
         MarginSettler marginSettler = new MarginSettler(
             LIMIT_ORDER_PROTOCOL,
-            AAVE_V3_POOL,
             UNISWAP_V3_ROUTER
         );
 
@@ -34,12 +32,6 @@ contract DeployMarginSettler is Script {
 
         // Verify deployment
         console.log("Verifying deployment...");
-        console.log(
-            "Limit Order Protocol:",
-            marginSettler.LIMIT_ORDER_PROTOCOL()
-        );
-        console.log("Aave V3 Pool:", marginSettler.AAVE_V3_POOL());
-        console.log("Uniswap V3 Router:", marginSettler.UNISWAP_V3_ROUTER());
 
         // Log deployment information
         console.log("\n=== DEPLOYMENT COMPLETE ===");

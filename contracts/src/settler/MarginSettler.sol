@@ -22,7 +22,6 @@ import {ContractSigner} from "../signer/ContractSigner.sol";
 import {ComposerCommands} from "../composer/lib/enums/DeltaEnums.sol";
 import {Lending} from "../composer/lending/Lending.sol";
 import {MorphoFlashLoanSimple} from "../composer/flashLoan/MorphoSimple.sol";
-import {ExternalCall} from "../composer/externalCall/ExternalCall.sol";
 import {Transfers} from "../composer/transfers/Transfers.sol";
 import {Permits} from "../composer/permit/Permits.sol";
 import "../Errors.sol";
@@ -65,7 +64,6 @@ contract MarginSettler is
     ContractSigner,
     Lending,
     MorphoFlashLoanSimple,
-    ExternalCall,
     Transfers,
     Permits,
     EIP712
