@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { useAccount } from "wagmi"
-import { MarginService, MarginOrderParams } from "@/services/marginService"
-import { Token, Position, Order } from "@/components/MarginTradingInterface"
+import { MarginService, MarginOrderParams, OrderResult } from "@/services/marginService"
+import { Token } from "@/shared/consts"
+import { Position, Order } from "@/components/MarginTradingInterface"
+import { handleError, getUserFriendlyErrorMessage, MarginTradingError } from "@/utils/errorHandling"
 
 export function useMarginTrading() {
     const { address, isConnected } = useAccount()
@@ -80,16 +82,15 @@ export function useMarginTrading() {
             setLoading(true)
             setError(null)
 
-            // Check and approve tokens if needed
+            // Step 1: Check and approve tokens if needed
             const allowances = await marginService.checkAllowances(address, [params.collateralToken.address, params.debtToken.address])
-
             const needsApproval = allowances.some((allowance) => allowance.allowance === "0")
 
             if (needsApproval) {
                 await marginService.approveTokens([params.collateralToken.address, params.debtToken.address])
             }
 
-            // Create margin order
+            // Step 2: Create margin order with signatures
             const orderParams: MarginOrderParams = {
                 collateralToken: params.collateralToken.address,
                 debtToken: params.debtToken.address,
@@ -98,16 +99,23 @@ export function useMarginTrading() {
                 positionType: params.positionType,
             }
 
-            const result = await marginService.createMarginOrder(orderParams)
+            const orderResult: OrderResult = await marginService.createMarginOrder(orderParams)
 
-            // Reload positions and orders
+            // Step 3: Submit order for execution (this would trigger the flash loan fill)
+            const submission = await marginService.submitOrder(orderResult, true) // Use relayer by default
+
+            console.log("Order submission result:", submission)
+
+            // Step 4: Reload positions and orders
             await Promise.all([loadPositions(), loadOrders()])
 
-            return result
+            return orderResult
         } catch (err) {
             console.error("Error opening position:", err)
-            setError(err instanceof Error ? err.message : "Failed to open position")
-            throw err
+            const marginError = err instanceof MarginTradingError ? err : handleError(err, "opening position")
+            const userMessage = getUserFriendlyErrorMessage(marginError)
+            setError(userMessage)
+            throw marginError
         } finally {
             setLoading(false)
         }
