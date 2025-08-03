@@ -5,6 +5,8 @@ import { useMarginTrading } from "@/hooks/useMarginTrading"
 import { loadTokenData, Token } from "@/shared/consts"
 import { OrdersList } from "./OrdersList"
 import { PositionsList } from "./PositionsList"
+import { FlashFillExplainer } from "./FlashFillExplainer"
+import { MarginTradingError, getUserFriendlyErrorMessage } from "@/utils/errorHandling"
 
 export interface Position {
     id: string
@@ -15,6 +17,12 @@ export interface Position {
     debtAmount: string
     healthFactor: string
     liquidationThreshold: string
+    // Enhanced monitoring fields
+    riskLevel?: "low" | "medium" | "high" | "critical"
+    warnings?: string[]
+    collateralValueUSD?: string
+    debtValueUSD?: string
+    netWorthUSD?: string
 }
 
 export interface Order {
@@ -58,12 +66,12 @@ export function MarginTradingInterface() {
         }
 
         try {
-            await openPosition({
-                collateralToken: shortToken,
-                debtToken: longToken,
-                collateralAmount: shortAmount,
-                debtAmount: longAmount,
-                positionType: "short",
+            const result = await openPosition({
+                collateralToken: longToken, // What we're depositing as collateral (WETH)
+                debtToken: shortToken, // What we're borrowing (USDC)
+                collateralAmount: longAmount, // Amount of WETH to deposit
+                debtAmount: shortAmount, // Amount of USDC to borrow
+                positionType: "short", // We're shorting by borrowing USDC to buy WETH
             })
 
             setShortAmount("0.0")
@@ -71,10 +79,12 @@ export function MarginTradingInterface() {
             setShortToken(null)
             setLongToken(null)
 
-            alert("Position opened successfully!")
+            alert(`Position opened successfully!\nOrder Hash: ${result.orderHash.slice(0, 10)}...`)
         } catch (err) {
             console.error("Failed to open position:", err)
-            alert(`Failed to open position: ${err instanceof Error ? err.message : "Unknown error"}`)
+            const errorMessage =
+                err instanceof MarginTradingError ? getUserFriendlyErrorMessage(err) : err instanceof Error ? err.message : "Unknown error occurred"
+            alert(`Failed to open position: ${errorMessage}`)
         }
     }
 
@@ -118,12 +128,18 @@ export function MarginTradingInterface() {
             <div className="tabs tabs-lift">
                 <input type="radio" name="my_tabs_3" className="tab" aria-label="Open" defaultChecked />
                 <div className="tab-content bg-base-100 border-base-300 p-6">
+                    {/* Flash Fill Explainer */}
+                    <FlashFillExplainer />
+
                     {/* Position Sections */}
                     <div className="card bg-base-200 shadow-xl">
                         <div className="card-body">
-                            {/* Short Position */}
+                            {/* Borrow Amount */}
                             <div className="mb-6">
-                                <label className="text-base-content text-sm font-medium mb-2 block">Short</label>
+                                <label className="text-base-content text-sm font-medium mb-2 block">
+                                    Borrow Amount
+                                    <span className="text-xs opacity-60 ml-2">(Amount to borrow for leverage)</span>
+                                </label>
                                 <div className="flex items-center gap-4">
                                     <input
                                         type="number"
@@ -226,9 +242,12 @@ export function MarginTradingInterface() {
                                 </button>
                             </div>
 
-                            {/* Long Position */}
+                            {/* Collateral Amount */}
                             <div className="mb-6">
-                                <label className="text-base-content text-sm font-medium mb-2 block">Long</label>
+                                <label className="text-base-content text-sm font-medium mb-2 block">
+                                    Collateral Amount
+                                    <span className="text-xs opacity-60 ml-2">(Amount to deposit as collateral)</span>
+                                </label>
                                 <div className="flex items-center gap-4">
                                     <input
                                         type="number"
@@ -327,14 +346,30 @@ export function MarginTradingInterface() {
                                     {loading ? (
                                         <>
                                             <span className="loading loading-spinner loading-sm"></span>
-                                            Opening Position...
+                                            Creating Flash Fill Order...
                                         </>
                                     ) : !isConnected ? (
-                                        "Connect"
+                                        "Connect Wallet"
                                     ) : (
-                                        "Open Position"
+                                        "Create Flash Fill Order"
                                     )}
                                 </button>
+
+                                {/* Additional Info */}
+                                <div className="mt-4 text-sm opacity-70">
+                                    <div className="flex justify-between">
+                                        <span>Leverage Ratio:</span>
+                                        <span>
+                                            {longAmount !== "0.0" && shortAmount !== "0.0"
+                                                ? `${((parseFloat(shortAmount) + parseFloat(longAmount)) / parseFloat(longAmount)).toFixed(2)}x`
+                                                : "N/A"}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between mt-1">
+                                        <span>Position Type:</span>
+                                        <span>Leveraged Long {longToken?.symbol || "Token"}</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
