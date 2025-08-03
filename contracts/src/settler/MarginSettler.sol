@@ -143,8 +143,14 @@ contract MarginSettler is
     string private constant _NAME = "1DeltaMarginSettler";
     string private constant _VERSION = "1";
 
-    constructor(address limitOrderProtocol) EIP712(_NAME, _VERSION) {
+    address private immutable _ROUTER;
+
+    constructor(
+        address limitOrderProtocol,
+        address swapRouter
+    ) EIP712(_NAME, _VERSION) {
         _LIMIT_ORDER_PROTOCOL = limitOrderProtocol;
+        _ROUTER = swapRouter;
     }
 
     modifier onlyLimitOrderProtocol() {
@@ -229,7 +235,7 @@ contract MarginSettler is
             action.length := sub(extension.length, 32)
         }
         // The lending operations map taker and maker amount as makerAmount: inputAmount, takerAmount: outputAmount
-        _composer(user, takingAmount, makingAmount, action);
+        _batchExecuteSignedOp(user, takingAmount, makingAmount, action);
     }
 
     function takerAssetSuffix(
@@ -244,7 +250,7 @@ contract MarginSettler is
         return ExtensionLib.preInteractionTargetAndData(data);
     }
 
-    function _composer(
+    function _batchExecuteSignedOp(
         address callerAddress,
         uint256 takerAmount, // buy
         uint256 makerAmount, // sell
@@ -302,7 +308,7 @@ contract MarginSettler is
 
     function takerInteraction(
         IOrderMixin.Order calldata order,
-        bytes calldata extension,
+        bytes calldata action,
         bytes32 orderHash,
         address taker,
         uint256 makingAmount,
@@ -310,9 +316,8 @@ contract MarginSettler is
         uint256 remainingMakingAmount,
         bytes calldata extraData
     ) external override onlyLimitOrderProtocol {
-        address user = order.receiver.get();
-        // The lending operations map taker and maker amount as makerAmount: inputAmount, takerAmount: outputAmount
-        _composer(user, takingAmount, makingAmount, extraData);
+        (bool success, ) = _ROUTER.call(action);
+        require(success, "Taker Swap Action failed");
     }
 
     function postInteraction(
@@ -327,7 +332,7 @@ contract MarginSettler is
     ) external override onlyLimitOrderProtocol {
         address user = order.receiver.get();
         // The lending operations map taker and maker amount as makerAmount: inputAmount, takerAmount: outputAmount
-        _composer(user, takingAmount, makingAmount, extraData);
+        _batchExecuteSignedOp(user, takingAmount, makingAmount, extraData);
     }
 
     function takeOrder(

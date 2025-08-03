@@ -88,7 +88,9 @@ contract SigConstructionTest is MarginSettlerTest {
             console.logBytes(offsets);
             // the data needs to be abi coded with offset and length
             extensionCalldata = abi.encodePacked(offsets, extensionCalldata);
-            console.logBytes(marginSettler.preInteractionTargetAndData(extensionCalldata));
+            console.logBytes(
+                marginSettler.preInteractionTargetAndData(extensionCalldata)
+            );
         }
         console.logBytes(extensionCalldata);
 
@@ -169,17 +171,19 @@ contract SigConstructionTest is MarginSettlerTest {
             type(uint).max
         );
 
-      {  marginSettler.flashLoanFill(
-            AddressLib.get(order.takerAsset),
-            order.takingAmount,
-            abi.encode(
-                order,
-                orderSignature,
+        {
+            marginSettler.flashLoanFill(
+                AddressLib.get(order.takerAsset),
                 order.takingAmount,
-                _createTakerTraits(extensionCalldata.length, 0),
-                extensionCalldata,
-                extensionSignature
-            )
-        );}
+                abi.encode(
+                    order,
+                    orderSignature,
+                    order.takingAmount,
+                    _createTakerTraits(extensionCalldata.length, 0),
+                    extensionCalldata,
+                    extensionSignature
+                )
+            );
+        }
     }
 }

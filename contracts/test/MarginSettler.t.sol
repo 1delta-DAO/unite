@@ -46,7 +46,7 @@ contract MarginSettlerTest is Test {
         user = userWallet.addr;
         userPrivateKey = userWallet.privateKey;
 
-        marginSettler = new MarginSettler(LIMIT_ORDER_PROTOCOL);
+        marginSettler = new MarginSettler(LIMIT_ORDER_PROTOCOL, UNISWAP_V3_ROUTER);
 
         vm.label(user, "user");
         vm.label(address(marginSettler), "marginSettler");
@@ -186,6 +186,26 @@ contract MarginSettlerTest is Test {
         );
         return extCalldata;
     }
+
+
+    function _createUnoSwapCalldata(address tokenIn, address tokenOut, uint256 amount) internal view returns (bytes memory) {
+        // in taker interaction, we swap the maker token to taker token
+        bytes memory extCalldata = abi.encodeWithSelector(
+            0x414bf389, // exactInputSingle
+            abi.encode(
+                tokenIn,
+                tokenOut,
+                3000,
+                address(marginSettler),
+                block.timestamp + 1800,
+                amount,
+                0,
+                0
+            )
+        );
+        return extCalldata;
+    }
+
 
     function _createGetFlashloanCalldata()
         internal
