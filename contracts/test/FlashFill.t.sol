@@ -15,6 +15,7 @@ import {SweepType} from "../src/composer/lib/enums/MiscEnums.sol";
 import {MarginSettlerTest} from "./MarginSettler.t.sol";
 import {LendingEncoder} from "./utils/LendingEncoder.sol";
 
+/** ABI for aave delegation and supply to the pool */
 interface IDelegation {
     function approveDelegation(address, uint) external;
 
@@ -26,9 +27,10 @@ interface IDelegation {
     ) external;
 }
 
-contract SigConstructionTest is MarginSettlerTest {
+contract FlashFillTest is MarginSettlerTest {
     uint256 internal constant zero = 0;
 
+    // create the calldata for opening a position on Aave
     function createOpen(
         address tokenIn,
         address tokenOut,
@@ -41,8 +43,23 @@ contract SigConstructionTest is MarginSettlerTest {
 
         return d;
     }
-
-    function test_sig_construct() external {
+    /**
+     * Test steps
+     * 0) setup, create contracts and filler, signer (the user) address
+     * 1) create order object (this is to sell (borrow) 360 USDC for (deposit]) 0.1 WETH on Aave V3 Arbitrum)
+     * 2) create extension calldata (create operations that have all addreses needed)
+     * 3) sign extension hash for validation
+     * 4) attach extension hash to order.salt (as required by 1inch) and sing the order.
+     * 5) create base setup for execution
+     *    5.1) approve & deposit initial margin to Aave (this can be added to operations, we just have not had the time for that)
+     *    5.2) permission settler to be able to borrow from Aave on signer's behalf (this can be a permit and added to pre-interaction)   
+     * 6) The filler defines the calldata
+     *    6.1) create custom fill operation with uniswap V3 routing, can also be 1inch path-finder execution ;)) - we assume that the filler has no inventory
+     *    6.2) create taker traits that point to the extension and custon fill operation
+     *    6.3) execute `flashLoanFill` on our settlement contract  
+     * 7) Prove that the position was created via asserts
+     */
+    function test_flash_fill() external {
         VmSafe.Wallet memory wallet = vm.createWallet("signer");
         uint256 signerPrivateKey = wallet.privateKey;
         address signerAddress = wallet.addr;
@@ -53,6 +70,7 @@ contract SigConstructionTest is MarginSettlerTest {
         vm.label(signerAddress, "signerAddress");
         vm.label(fillerAddress, "fillerAddress");
 
+        /** THIS IS WHAT THE USER SIGNER DOES */
         IOrderMixin.Order memory order = _createOrder();
 
         // the calldata follows this pattern
@@ -127,6 +145,7 @@ contract SigConstructionTest is MarginSettlerTest {
             type(uint).max
         );
 
+        /** THIS IS WHAT THE FILLER DOES */
         {
             // create taker actio n to fill with router
             bytes memory swapCalldata = _createUnoSwapCalldata(
@@ -162,6 +181,7 @@ contract SigConstructionTest is MarginSettlerTest {
             );
         }
 
+        /** VALIDATE THAT POSITION AHS BEEN CREATED */
         uint256 collateralUser = IERC20(AAVE_V3_WETH_COLLATERAL).balanceOf(
             signerAddress
         );
