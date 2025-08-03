@@ -28,10 +28,8 @@ interface IDelegation {
 }
 
 contract FlashFillTest is MarginSettlerTest {
-    uint256 internal constant zero = 0;
-
     // create the calldata for opening a position on Aave
-    function createOpen(
+    function _createOpen(
         address tokenIn,
         address tokenOut,
         address pool
@@ -52,11 +50,11 @@ contract FlashFillTest is MarginSettlerTest {
      * 4) attach extension hash to order.salt (as required by 1inch) and sing the order.
      * 5) create base setup for execution
      *    5.1) approve & deposit initial margin to Aave (this can be added to operations, we just have not had the time for that)
-     *    5.2) permission settler to be able to borrow from Aave on signer's behalf (this can be a permit and added to pre-interaction)   
+     *    5.2) permission settler to be able to borrow from Aave on signer's behalf (this can be a permit and added to pre-interaction)
      * 6) The filler defines the calldata
      *    6.1) create custom fill operation with uniswap V3 routing, can also be 1inch path-finder execution ;)) - we assume that the filler has no inventory
      *    6.2) create taker traits that point to the extension and custon fill operation
-     *    6.3) execute `flashLoanFill` on our settlement contract  
+     *    6.3) execute `flashLoanFill` on our settlement contract
      * 7) Prove that the position was created via asserts
      */
     function test_flash_fill() external {
@@ -70,8 +68,20 @@ contract FlashFillTest is MarginSettlerTest {
         vm.label(signerAddress, "signerAddress");
         vm.label(fillerAddress, "fillerAddress");
 
+        /**
+         * @notice config to use
+         * Edit if market conditions change - as we need Uniswap V3 to be able to attain the defined swap rate or better for filling
+         */
+        UserOrderDefinition memory trade = UserOrderDefinition({
+            borrowAsset: USDC,
+            collateralAsset: WETH,
+            initialMargin: 0.1e18,
+            borrowAmount: 360.0e6, // this prices WETH at 3600 USDC - edit if it is too low for market conditions
+            depositAmount: 0.1e18
+        });
+
         /** THIS IS WHAT THE USER SIGNER DOES */
-        IOrderMixin.Order memory order = _createOrder();
+        IOrderMixin.Order memory order = _createOrder(trade);
 
         // the calldata follows this pattern
         // enum DynamicField {
@@ -89,7 +99,7 @@ contract FlashFillTest is MarginSettlerTest {
         bytes memory extensionCalldata = abi.encodePacked(
             address(marginSettler), // call target in first 20 bytes
             address(signerAddress), // signer in second 20 bytes
-            createOpen(USDC, WETH, AAVE_V3_POOL) // calldata start
+            _createOpen(trade.borrowAsset, trade.collateralAsset, AAVE_V3_POOL) // calldata start
         );
         {
             bytes memory offsets = abi.encodePacked(
@@ -100,7 +110,7 @@ contract FlashFillTest is MarginSettlerTest {
                 uint32(0), // cumulative length Predicate
                 uint32(extensionCalldata.length), // cumulative length MakerPermit
                 uint32(extensionCalldata.length), // cumulative length PreInteractionData // 7*32
-                uint32(0) // cumulative length PostInteractionData // 8*32
+                uint32(extensionCalldata.length) // cumulative length PostInteractionData // 8*32
             );
             // the data needs to be abi coded with offset and length
             extensionCalldata = abi.encodePacked(offsets, extensionCalldata);
@@ -130,13 +140,16 @@ contract FlashFillTest is MarginSettlerTest {
 
         // approve pool
         vm.prank(signerAddress);
-        IERC20(WETH).approve(AAVE_V3_POOL, type(uint).max);
-
-        uint256 initialMargin = 0.1e18;
+        IERC20(trade.collateralAsset).approve(AAVE_V3_POOL, type(uint).max);
 
         // deposit margin
         vm.prank(signerAddress);
-        IDelegation(AAVE_V3_POOL).supply(WETH, initialMargin, signerAddress, 0);
+        IDelegation(AAVE_V3_POOL).supply(
+            trade.collateralAsset,
+            trade.initialMargin,
+            signerAddress,
+            0
+        );
 
         // approve borrowing
         vm.prank(signerAddress);
@@ -191,7 +204,7 @@ contract FlashFillTest is MarginSettlerTest {
         // - the takingAmount plus initial margin in collateral
         assertApproxEqRel(
             collateralUser,
-            order.takingAmount + initialMargin,
+            order.takingAmount + trade.initialMargin,
             0.00000001e18
         );
 

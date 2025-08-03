@@ -4,13 +4,17 @@
 
 Execute pre-action as composed lending operations.
 
-100% Gasless for users.
+100% Gasless possible for users.
 
-Partial fils included.
+Partial fils possibly included.
 
-Many lenders supported.
+Many lenders supported (Aave, Morpho and Compounds).
 
-Moonshot: Triggers.
+Triggers possible in `postInteraction`.
+
+## Contract architecture
+
+
 
 # ToDos
 
