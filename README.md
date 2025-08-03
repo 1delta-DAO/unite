@@ -41,24 +41,24 @@ Triggers possible in `postInteraction`.
 6) The user now holds a leveraged position in Aave V3 that has bee conditionally opened and the filler fulfilled that order without holding inventory.
 
 
+## Execute tests
+We added full tests for the flow from the deposit of the initial margin, permissioning until the filli ng with uniswap V3.
 
-# ToDos
+They can be run via the following commands:
 
-## UI
-- Build limit order interface
-- Get simple data provision (maybe we do Morpho B first)
-- Create default sig setup using 1inch SDK to be able to sign at least default orders
-- Build shell for costom data inclusion
+ ```bash
+ cd contracts
+ forge test --match-test test_flash_fill -vvvv ## vebosity is to show all events (aave operations, 1inch limit order fill)
+ ```
 
-## Contracts
-- Build lending (contract) APIs with amounts (amounts cannot be encoded on actions as we want to allow partial fills)
-- Define states that enables partial fills (validate call from 1inch router and store the partials based on the hash)
-- build pre-defined flash loan selection that wraps the fill call (Morpho B is enough here)
-- ideally: build it so that there are no additional sigs required asisde of order & lending permits
+Asserts at the end ensure that teh correct balances were created for the user.
 
-## Backend
-- Build filler API
-   - The filler can be a worker  with a simple KV that collects all orders
-   - Just run a cron that stores and exposes the orders
-   - Build a reader that reads the orders
-   - build calldata that uses 1inch aggregation API and flash loan selection (default: Morpho B) to fill an order if possible
+
+# Resources
+
+## 1delta contracts for lending
+- we derived our aave and morpho lending operations from [1delta contracts](https://github.com/1delta-DAO/contracts-delegation/tree/main/contracts/1delta/composer/lending) 
+- we changed them to have dynamic (not within calldata) amount definitions to link them with the filling amounts
+- we also added the permits (which are not used in our tests) which enable pulling (and borrowing) the funds from the user in a gasless manner
+
+All other parts have been written from scratch (`MarginSettlement`, `ContractSigner` and tests)
