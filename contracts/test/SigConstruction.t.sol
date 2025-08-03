@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {Test, console} from "forge-std/Test.sol";
+import {console} from "forge-std/console.sol";
+import {Test} from "forge-std/Test.sol";
 import {VmSafe} from "forge-std/Vm.sol";
 import {MarginSettler} from "../src/settler/MarginSettler.sol";
 import {IOrderMixin} from "@1inch/lo/interfaces/IOrderMixin.sol";
@@ -81,7 +82,7 @@ contract SigConstructionTest is MarginSettlerTest {
                 uint32(0), // start Predicate
                 uint32(extensionCalldata.length), // start MakerPermit
                 uint32(extensionCalldata.length), // start PreInteractionData // 7*32
-                uint32(extensionCalldata.length) // start PostInteractionData // 8*32
+                uint32(0) // start PostInteractionData // 8*32
             );
 
             console.log("--- offsets");
@@ -119,12 +120,12 @@ contract SigConstructionTest is MarginSettlerTest {
         console.log("signerAddress", signerAddress);
         console.log("orderHash");
         console.logBytes32(orderHash);
-        console.logBytes(extensionSignature);
+        console.logBytes(extensionCalldata);
 
         console.log("-------");
         console.logBytes32(bytes32(type(uint160).max & uint256(extensionHash)));
         console.logBytes32(bytes32(order.salt));
-        console.logBytes32(keccak256(extensionCalldata));
+        console.logBytes32(extensionHash);
         console.log(
             "uint256(keccak256(extension)) & type(uint160).max != order.salt & type(uint160).max",
             uint256(keccak256(extensionCalldata)) & type(uint160).max !=
@@ -136,15 +137,15 @@ contract SigConstructionTest is MarginSettlerTest {
         // console.log(TakerTraitsLib.usePermit2(takerTraits));
         // }
         // test calls
-        {
-            (, bytes memory a, bytes memory b) = marginSettler._parseArgs(
-                _createTakerTraits(extensionCalldata.length, 0),
-                extensionCalldata
-            );
-            console.logBytes(b);
+        // {
+        //     (, bytes memory a, bytes memory b) = marginSettler._parseArgs(
+        //         _createTakerTraits(extensionCalldata.length, 0),
+        //         extensionCalldata
+        //     );
+        //     console.logBytes(b);
 
-            console.logBytes(marginSettler.takerAssetSuffix(a));
-        }
+        //     console.logBytes(marginSettler.takerAssetSuffix(a));
+        // }
         // marginSettler.preInteractionTargetAndData(a);
         // console.logBytes(extensionCalldata);
         // vm.expectRevert(0x398d4d32);
@@ -172,17 +173,35 @@ contract SigConstructionTest is MarginSettlerTest {
         );
 
         {
+
+            // create taker actio n to fill with router
+            bytes memory swapCalldata = _createUnoSwapCalldata(
+                AddressLib.get(order.makerAsset),
+                AddressLib.get(order.takerAsset),
+                order.makingAmount
+            );
+
+            // attach target
+            swapCalldata = abi.encodePacked(address(marginSettler), swapCalldata);
+
+            // create calldata for flash
+            swapCalldata = abi.encode(
+                order,
+                orderSignature,
+                order.takingAmount,
+                _createTakerTraits(
+                    extensionCalldata.length,
+                    swapCalldata.length
+                ),
+                abi.encodePacked(extensionCalldata, swapCalldata),
+                extensionSignature
+            );
+
+            // fill
             marginSettler.flashLoanFill(
                 AddressLib.get(order.takerAsset),
                 order.takingAmount,
-                abi.encode(
-                    order,
-                    orderSignature,
-                    order.takingAmount,
-                    _createTakerTraits(extensionCalldata.length, 0),
-                    extensionCalldata,
-                    extensionSignature
-                )
+                swapCalldata
             );
         }
     }

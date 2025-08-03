@@ -161,7 +161,7 @@ contract MarginSettler is
 
     function hashExtension(
         bytes memory extension
-    ) external view returns (bytes32) {
+    ) public view returns (bytes32) {
         return _hashTypedDataV4(keccak256(extension));
     }
 
@@ -316,7 +316,8 @@ contract MarginSettler is
         uint256 remainingMakingAmount,
         bytes calldata extraData
     ) external override onlyLimitOrderProtocol {
-        (bool success, ) = _ROUTER.call(action);
+        IERC20(order.makerAsset.get()).approve(_ROUTER, type(uint).max);
+        (bool success, ) = _ROUTER.call(extraData);
         require(success, "Taker Swap Action failed");
     }
 
@@ -332,7 +333,8 @@ contract MarginSettler is
     ) external override onlyLimitOrderProtocol {
         address user = order.receiver.get();
         // The lending operations map taker and maker amount as makerAmount: inputAmount, takerAmount: outputAmount
-        _batchExecuteSignedOp(user, takingAmount, makingAmount, extraData);
+        // _batchExecuteSignedOp(user, takingAmount, makingAmount, extraData);
+        return;
     }
 
     function takeOrder(
@@ -360,7 +362,8 @@ contract MarginSettler is
         {
             // extract extension
             (, bytes memory extension, ) = _parseArgs(takerTraits, args);
-            bytes32 extensionHash = _hashTypedDataV4(keccak256(extension));
+
+            bytes32 extensionHash = hashExtension(extension);
             // recover the signer of the extension
             signer = _recoverSigner(extensionHash, extensionSignature);
         }
@@ -401,9 +404,9 @@ contract MarginSettler is
                 (IOrderMixin.Order, bytes, uint256, TakerTraits, bytes, bytes)
             );
 
-        this.preInteractionTargetAndData(args);
+        // this.preInteractionTargetAndData(args);
         this.takeOrder(order, signature, amount, takerTraits, args, extSig);
-
+ 
         IERC20(order.takerAsset.get()).approve(msg.sender, type(uint256).max);
     }
     /**
@@ -442,6 +445,7 @@ contract MarginSettler is
         }
 
         uint256 interactionLength = takerTraits.argsInteractionLength();
+
         if (interactionLength > 0) {
             interaction = args[:interactionLength];
         } else {

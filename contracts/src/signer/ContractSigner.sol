@@ -3,7 +3,6 @@ pragma solidity ^0.8.30;
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import "../Errors.sol";
-
 abstract contract ContractSigner is IERC1271 {
     function isValidSignature(
         bytes32 orderHash,
@@ -31,7 +30,6 @@ abstract contract ContractSigner is IERC1271 {
             signer := shr(96, calldataload(add(signature.offset, 65)))
         }
         address recoveredSigner = ECDSA.recover(orderHash, v, r, s);
-
         if (recoveredSigner == signer && recoveredSigner != address(0)) {
             return IERC1271.isValidSignature.selector;
         }

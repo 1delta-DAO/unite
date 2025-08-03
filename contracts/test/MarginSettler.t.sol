@@ -131,7 +131,7 @@ contract MarginSettlerTest is Test {
     function _createTakerTraits(
         uint256 extensionLength,
         uint256 interactionLength
-    ) internal view returns (TakerTraits) {
+    ) internal view returns (TakerTraits tt) {
         uint256 traits = 0;
 
         // ARGS_EXTENSION_LENGTH
@@ -140,7 +140,9 @@ contract MarginSettlerTest is Test {
         // ARGS_INTERACTION_LENGTH
         traits |= (interactionLength << 200);
 
-        return TakerTraits.wrap(traits);
+        tt =  TakerTraits.wrap(traits);
+
+        return tt;
     }
 
     function _createOrder() internal view returns (IOrderMixin.Order memory) {
@@ -152,7 +154,7 @@ contract MarginSettlerTest is Test {
                 takerAsset: Address.wrap(uint256(uint160(WETH))),
                 makerAsset: Address.wrap(uint256(uint160(USDC))),
                 takingAmount: 0.1e18,
-                makingAmount: 100.0e6,
+                makingAmount: 360.0e6,
                 makerTraits: _createMakerTraits()
             });
     }
@@ -192,16 +194,14 @@ contract MarginSettlerTest is Test {
         // in taker interaction, we swap the maker token to taker token
         bytes memory extCalldata = abi.encodeWithSelector(
             0x414bf389, // exactInputSingle
-            abi.encode(
                 tokenIn,
                 tokenOut,
                 3000,
                 address(marginSettler),
-                block.timestamp + 1800,
+                type(uint).max,
                 amount,
                 0,
                 0
-            )
         );
         return extCalldata;
     }
