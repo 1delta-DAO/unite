@@ -27,7 +27,49 @@ import {ExternalCall} from "../composer/externalCall/ExternalCall.sol";
 import {Transfers} from "../composer/transfers/Transfers.sol";
 import {Permits} from "../composer/permit/Permits.sol";
 import "../Errors.sol";
-import {console} from "forge-std/console.sol";
+
+type Offsets is uint256;
+
+/// @title OffsetsLib
+/// @dev A library for retrieving values by offsets from a concatenated calldata.
+library OffsetsLib {
+    /// @dev Error to be thrown when the offset is out of bounds.
+    error OffsetOutOfBounds();
+
+    /**
+     * @notice Retrieves the field value calldata corresponding to the provided field index from the concatenated calldata.
+     * @dev
+     * The function performs the following steps:
+     * 1. Retrieve the start and end of the segment corresponding to the provided index from the offsets array.
+     * 2. Get the value from segment using offset and length calculated based on the start and end of the segment.
+     * 3. Throw `OffsetOutOfBounds` error if the length of the segment is greater than the length of the concatenated data.
+     * @param offsets The offsets encoding the start and end of each segment within the concatenated calldata.
+     * @param concat The concatenated calldata.
+     * @param index The index of the segment to retrieve. The field index 0 corresponds to the lowest bytes of the offsets array.
+     * @return result The calldata from a segment of the concatenated calldata corresponding to the provided index.
+     */
+    function get(
+        Offsets offsets,
+        bytes calldata concat,
+        uint256 index
+    ) internal pure returns (bytes calldata result) {
+        bytes4 exception = OffsetOutOfBounds.selector;
+        uint256 end;
+        uint256 begin;
+        assembly ("memory-safe") {
+            // solhint-disable-line no-inline-assembly
+            let bitShift := shl(5, index) // bitShift = index * 32
+            begin := and(0xffffffff, shr(bitShift, shl(32, offsets))) // begin = offsets[ bitShift : bitShift + 32 ]
+            end := and(0xffffffff, shr(bitShift, offsets)) // end   = offsets[ bitShift + 32 : bitShift + 64 ]
+            result.offset := add(concat.offset, begin)
+            result.length := sub(end, begin)
+            if gt(end, concat.length) {
+                mstore(0, exception)
+                revert(0, 4)
+            }
+        }
+    }
+}
 
 contract MarginSettler is
     IPostInteraction,
@@ -48,6 +90,53 @@ contract MarginSettler is
     using Math for uint256;
     using MakerTraitsLib for MakerTraits;
     using TakerTraitsLib for TakerTraits;
+
+    enum DynamicField {
+        MakerAssetSuffix,
+        TakerAssetSuffix,
+        MakingAmountData,
+        TakingAmountData,
+        Predicate,
+        MakerPermit,
+        PreInteractionData,
+        PostInteractionData,
+        CustomData
+    }
+
+    /**
+     * @notice Returns the TakerAssetSuffix from the provided extension calldata.
+     * @param extension The calldata from which the TakerAssetSuffix is to be retrieved.
+     * @return calldata Bytes representing the TakerAssetSuffix.
+     */
+    function _takerAssetSuffix(
+        bytes calldata extension
+    ) internal pure returns (bytes calldata) {
+        return _get(extension, DynamicField.TakerAssetSuffix);
+    }
+
+    /**
+     * @notice Retrieves a specific field from the provided extension calldata.
+     * @dev The first 32 bytes of an extension calldata contain offsets to the end of each field within the calldata.
+     * @param extension The calldata from which the field is to be retrieved.
+     * @param field The specific dynamic field to retrieve from the extension.
+     * @return calldata Bytes representing the requested field.
+     */
+    function _get(
+        bytes calldata extension,
+        DynamicField field
+    ) private pure returns (bytes calldata) {
+        if (extension.length < 0x20) return msg.data[:0];
+
+        Offsets offsets;
+        bytes calldata concat;
+        assembly ("memory-safe") {
+            // solhint-disable-line no-inline-assembly
+            offsets := calldataload(extension.offset)
+            concat.offset := add(extension.offset, 0x20)
+            concat.length := sub(extension.length, 0x20)
+        }
+        return OffsetsLib.get(offsets, concat, uint256(field));
+    }
 
     address private immutable _LIMIT_ORDER_PROTOCOL;
 
@@ -134,13 +223,24 @@ contract MarginSettler is
     ) external override onlyLimitOrderProtocol {
         // usafe: the receiver cannot be the user here, the user data should be extracted from the order or extension data (via signer)
         address user = order.receiver.get();
+        bytes calldata action;
+        assembly {
+            action.offset := add(extension.offset, 32)
+            action.length := sub(extension.length, 32)
+        }
         // The lending operations map taker and maker amount as makerAmount: inputAmount, takerAmount: outputAmount
-        _composer(user, takingAmount, makingAmount, extension);
+        _composer(user, takingAmount, makingAmount, action);
+    }
+
+    function takerAssetSuffix(
+        bytes calldata data
+    ) external pure returns (bytes memory) {
+        return _takerAssetSuffix(data);
     }
 
     function preInteractionTargetAndData(
         bytes calldata data
-    ) external pure returns (bytes memory) {
+    ) public pure returns (bytes memory) {
         return ExtensionLib.preInteractionTargetAndData(data);
     }
 
@@ -155,16 +255,11 @@ contract MarginSettler is
         uint256 currentOffset;
         bytes32 d;
         assembly {
-            length := sub(lendingOps.length, 84)
+            length := lendingOps.length
             maxIndex := add(length, lendingOps.offset)
-            currentOffset := add(84, lendingOps.offset)
-            d := calldataload(add(84, lendingOps.offset))
+            currentOffset := add(20, lendingOps.offset)
+            d := calldataload(add(20, lendingOps.offset))
         }
-        console.logBytes32(d);
-
-        console.log(address(this));
-        console.log("lendingOps");
-        console.logBytes(lendingOps);
 
         while (true) {
             uint256 operation;
@@ -174,7 +269,6 @@ contract MarginSettler is
                 // we increment the current offset to skip the operation
                 currentOffset := add(1, currentOffset)
             }
-            console.log("operation", operation);
             if (operation == ComposerCommands.LENDING) {
                 currentOffset = _lendingOperations(
                     callerAddress,
@@ -241,38 +335,30 @@ contract MarginSettler is
         bytes calldata signature,
         uint256 amount,
         TakerTraits takerTraits,
-        bytes calldata args
+        bytes calldata args,
+        bytes calldata extensionSignature
     )
         external
         returns (uint256 makingAmount, uint256 takingAmount, bytes32 orderHash)
     {
         // approve self
-        IERC20(order.takerAsset.get()).approve(_LIMIT_ORDER_PROTOCOL, type(uint).max);
-        IERC20(order.makerAsset.get()).approve(_LIMIT_ORDER_PROTOCOL, type(uint).max);
+        IERC20(order.takerAsset.get()).approve(
+            _LIMIT_ORDER_PROTOCOL,
+            type(uint).max
+        );
+        IERC20(order.makerAsset.get()).approve(
+            _LIMIT_ORDER_PROTOCOL,
+            type(uint).max
+        );
 
-
-        // extract extension
-        (, bytes memory extension, ) = _parseArgs(takerTraits, args);
-        if (extension.length < 65) {
-            revert InvalidExtensionLength();
+        address signer;
+        {
+            // extract extension
+            (, bytes memory extension, ) = _parseArgs(takerTraits, args);
+            bytes32 extensionHash = _hashTypedDataV4(keccak256(extension));
+            // recover the signer of the extension
+            signer = _recoverSigner(extensionHash, extensionSignature);
         }
-
-        // last 65 bytes of the extension is the typedHash signature of the extension
-        bytes memory extensionSignature = new bytes(65);
-        assembly {
-            // copy extension signature to bytes
-            mcopy(
-                add(extensionSignature, 0x20),
-                sub(add(mload(extension), add(extension, 0x20)), 65),
-                65
-            )
-            // shorten extension to data without signature
-            mstore(extension, sub(mload(extension), 65))
-        }
-
-        bytes32 extensionHash = _hashTypedDataV4(keccak256(extension));
-        // recover the signer of the extension
-        address signer = _recoverSigner(extensionHash, extensionSignature);
         return
             IOrderMixin(_LIMIT_ORDER_PROTOCOL).fillContractOrderArgs(
                 order,
@@ -303,12 +389,15 @@ contract MarginSettler is
             bytes memory signature,
             uint256 amount,
             TakerTraits takerTraits,
-            bytes memory args
+            bytes memory args,
+            bytes memory extSig
         ) = abi.decode(
                 data,
-                (IOrderMixin.Order, bytes, uint256, TakerTraits, bytes)
+                (IOrderMixin.Order, bytes, uint256, TakerTraits, bytes, bytes)
             );
-        this.takeOrder(order, signature, amount, takerTraits, args);
+
+        this.preInteractionTargetAndData(args);
+        this.takeOrder(order, signature, amount, takerTraits, args, extSig);
 
         IERC20(order.takerAsset.get()).approve(msg.sender, type(uint256).max);
     }

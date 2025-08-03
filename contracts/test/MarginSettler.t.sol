@@ -93,7 +93,8 @@ contract MarginSettlerTest is Test {
                 extensionCalldata.length,
                 takerInteractionCalldata.length
             ),
-            abi.encodePacked(extensionCalldata, takerInteractionCalldata)
+            abi.encodePacked(extensionCalldata, takerInteractionCalldata),
+            hex""
         );
     }
 

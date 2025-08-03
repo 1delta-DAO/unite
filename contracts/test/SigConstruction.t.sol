@@ -62,45 +62,37 @@ contract SigConstructionTest is MarginSettlerTest {
         //     PostInteractionData,
         //     CustomData
         // }
-        // the data needs to be abi coded with offset and length
-        bytes memory extensionCalldata = abi.encode(
-            abi.encodePacked(
-                // zero, // MakerAssetSuffix
-                // zero, // TakerAssetSuffix
-                // zero, // MakingAmountData
-                // zero, // TakingAmountData
-                // zero, // Predicate (makerPermit is 0x)
-                address(marginSettler), // PreInteractionData
-                createOpen(USDC, WETH, AAVE_V3_POOL)
-            )
+
+        bytes memory extensionCalldata = abi.encodePacked(
+            // zero, // MakerAssetSuffix
+            // zero, // TakerAssetSuffix
+            // zero, // MakingAmountData
+            // zero, // TakingAmountData
+            // zero, // Predicate (makerPermit is 0x)
+            address(marginSettler), // PreInteractionData
+            createOpen(USDC, WETH, AAVE_V3_POOL)
         );
+        {
+            bytes memory offsets = abi.encodePacked(
+                uint32(0), // start MakerAssetSuffix 0 * 32
+                uint32(0), // start TakerAssetSuffix
+                uint32(0), // start MakingAmountData
+                uint32(0), // start TakingAmountData
+                uint32(0), // start Predicate
+                uint32(extensionCalldata.length), // start MakerPermit
+                uint32(extensionCalldata.length), // start PreInteractionData // 7*32
+                uint32(extensionCalldata.length) // start PostInteractionData // 8*32
+            );
+
+            console.log("--- offsets");
+            console.logBytes(offsets);
+            // the data needs to be abi coded with offset and length
+            extensionCalldata = abi.encodePacked(offsets, extensionCalldata);
+            console.logBytes(marginSettler.preInteractionTargetAndData(extensionCalldata));
+        }
         console.logBytes(extensionCalldata);
 
-        deal(WETH, signerAddress, 1.0e18);
-        // errors
-        // console.logBytes4(bytes4(keccak256("InvalidExtensionHash()")));
-        // console.logBytes4(bytes4(keccak256("UnexpectedOrderExtension()")));
-        // console.logBytes4(bytes4(keccak256("MissingOrderExtension()")));
-
-        // console.logBytes4(bytes4(keccak256("PrivateOrder()")));
-        // console.logBytes4(bytes4(keccak256("OrderExpired()")));
-        // console.logBytes4(
-        //     bytes4(keccak256("EpochManagerAndBitInvalidatorsAreIncompatible()"))
-        // );
-        // console.logBytes4(bytes4(keccak256("WrongSeriesNonce()")));
-        // console.logBytes4(bytes4(keccak256("PredicateIsNotTrue()")));
-        // console.logBytes4(bytes4(keccak256("TakingAmountTooHigh()")));
-        // console.logBytes4(bytes4(keccak256("MakingAmountTooLow()")));
-        // console.logBytes4(bytes4(keccak256("TakingAmountExceeded()")));
-        // console.logBytes4(bytes4(keccak256("PartialFillNotAllowed()")));
-        // console.logBytes4(bytes4(keccak256("SwapWithZeroAmount()")));
-        // console.logBytes4(bytes4(keccak256("InvalidPermit2Transfer()")));
-        // console.logBytes4(
-        //     bytes4(keccak256("TransferFromTakerToMakerFailed()"))
-        // );
-        // console.logBytes4(bytes4(keccak256("IncorrectCalldataParams()")));
-        // console.logBytes4(bytes4(keccak256("OffsetOutOfBounds()")));
-        console.logBytes4(bytes4(keccak256("InvalidOperation()")));
+        deal(WETH, signerAddress, 0.1e18);
 
         bytes32 extensionHash = marginSettler.hashExtension(extensionCalldata);
         console.logBytes32(extensionHash);
@@ -110,16 +102,12 @@ contract SigConstructionTest is MarginSettlerTest {
         );
         bytes memory extensionSignature = abi.encodePacked(r, s, v);
 
-        bytes memory extensionArgs = abi.encodePacked(
-            // address(marginSettler),
-            extensionCalldata,
-            extensionSignature
-        );
+        // bytes memory extensionArgs = extensionCalldata;
 
         // lower 160 bits are the ext hash
         order.salt =
             (~type(uint160).max & order.salt) |
-            (type(uint160).max & uint256(keccak256(extensionArgs)));
+            (type(uint160).max & uint256(keccak256(extensionCalldata)));
         bytes32 orderHash = marginSettler.hashOrder(order);
 
         (v, r, s) = vm.sign(signerPrivateKey, orderHash);
@@ -134,31 +122,36 @@ contract SigConstructionTest is MarginSettlerTest {
         console.log("-------");
         console.logBytes32(bytes32(type(uint160).max & uint256(extensionHash)));
         console.logBytes32(bytes32(order.salt));
-        console.logBytes32(keccak256(extensionArgs));
+        console.logBytes32(keccak256(extensionCalldata));
         console.log(
             "uint256(keccak256(extension)) & type(uint160).max != order.salt & type(uint160).max",
-            uint256(keccak256(extensionArgs)) & type(uint160).max !=
+            uint256(keccak256(extensionCalldata)) & type(uint160).max !=
                 order.salt & type(uint160).max
         );
         console.log("-------");
-
-        // TakerTraits takerTraits = _createTakerTraits(extensionArgs.length, 0);
-
+        // {
+        //         TakerTraits takerTraits = _createTakerTraits(extensionCalldata.length, 0);
+        // console.log(TakerTraitsLib.usePermit2(takerTraits));
+        // }
         // test calls
-        // {        (, bytes memory a, bytes memory b ) = marginSettler._parseArgs(
-        //             _createTakerTraits(extensionArgs.length, 0),
-        //             extensionArgs
-        //         );
-        //         console.logBytes(b);}
+        {
+            (, bytes memory a, bytes memory b) = marginSettler._parseArgs(
+                _createTakerTraits(extensionCalldata.length, 0),
+                extensionCalldata
+            );
+            console.logBytes(b);
+
+            console.logBytes(marginSettler.takerAssetSuffix(a));
+        }
         // marginSettler.preInteractionTargetAndData(a);
-        // console.logBytes(extensionArgs);
+        // console.logBytes(extensionCalldata);
         // vm.expectRevert(0x398d4d32);
         // marginSettler.takeOrder(
         //     order,
         //     orderSignature,
         //     order.takingAmount,
         //     takerTraits,
-        //     extensionArgs
+        //     extensionCalldata
         // );
 
         // approve pool
@@ -176,16 +169,17 @@ contract SigConstructionTest is MarginSettlerTest {
             type(uint).max
         );
 
-        marginSettler.flashLoanFill(
+      {  marginSettler.flashLoanFill(
             AddressLib.get(order.takerAsset),
             order.takingAmount,
             abi.encode(
                 order,
                 orderSignature,
                 order.takingAmount,
-                _createTakerTraits(extensionArgs.length, 0),
-                extensionArgs
+                _createTakerTraits(extensionCalldata.length, 0),
+                extensionCalldata,
+                extensionSignature
             )
-        );
+        );}
     }
 }
