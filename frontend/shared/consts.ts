@@ -88,3 +88,18 @@ export async function loadTokenData(): Promise<Token[]> {
         return TOKENS
     }
 }
+
+export const MARGIN_SETTLER_ADDRESS = "0x0000000000000000000000000000000000000000" // TODO:
+export const LIMIT_ORDER_PROTOCOL = "0x111111125421ca6dc452d289314280a0f8842a65"
+export const WETH = "0x82af49447d8a07e3bd95bd0d56f35241523fbab1"
+export const USDC = "0xaf88d065e77c8cc2239327c5edb3a432268e5831"
+export const AAVE_V3_POOL = "0x794a61358d6845594f94dc1db02a252b5b4814ad"
+export const AAVE_V3_WETH = "0xe50fa9b3c56ffb159cb0fca61f5c9d750e8128c8"
+export const AAVE_v3_WETH_DEBT = "0x0c84331e39d6658cd6e6b9ba04736cc4c4734351"
+export const AAVE_V3_WETH_COLLATERAL = "0xe50fa9b3c56ffb159cb0fca61f5c9d750e8128c8"
+export const AAVE_V3_USDC = "0x625e7708f30ca75bfd92586e17077590c60eb4cd"
+export const AAVE_V3_USDC_DEBT = "0xf611aeb5013fd2c0511c9cd55c7dc5c1140741a6"
+export const CALL_FORWARDER = "0xfca1154c643c32638aee9a43eee7f377f515c801"
+export const UNISWAP_V3_FACTORY = "0x1f98431c8ad98523631ae4a59f267346ea31f984"
+export const UNISWAP_V3_ROUTER = "0xe592427a0aece92de3edee1f18e0157c05861564"
+export const UNISWAP_V3_QUOTER = "0xb27308f9f90d607463bb33ea1bebb41c27ce5ab6"

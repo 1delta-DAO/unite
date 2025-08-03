@@ -4,15 +4,7 @@ import { handleError, MarginTradingError, ErrorCodes, validateTokenAmount, valid
 import { SwapService } from "./swapService"
 import { PositionMonitor, AavePosition } from "./positionMonitor"
 import { RelayerService, RelayerQuote } from "./relayerService"
-
-// Contract addresses on Arbitrum
-const MARGIN_SETTLER_ADDRESS = "0x0000000000000000000000000000000000000000" // TODO:
-const LIMIT_ORDER_PROTOCOL_ADDRESS = "0x54431918cEC22932fCF208e2EaaF1339B3628177" // 1inch Limit Order Protocol V4 on Arbitrum
-const AAVE_V3_POOL = "0x794a61358D6845594F94dc1DB02A252b5b4814aD" // Aave V3 Pool on Arbitrum
-const USDC_ADDRESS = "0xaf88d065e77c8cc2239327c5edb3a432268e5831" // USDC on Arbitrum
-const WETH_ADDRESS = "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1" // WETH on Arbitrum
-const AAVE_V3_USDC_DEBT = "0x724dc807b04555b71ed48a6896b6F41593b8C637" // Aave V3 USDC Debt Token
-const AAVE_V3_WETH_COLLATERAL = "0xe50fA9b3c56FfB159cB0FCA61F5c9D750e8128c8" // Aave V3 WETH aToken
+import { AAVE_V3_POOL, MARGIN_SETTLER_ADDRESS, USDC, WETH } from "@/shared/consts"
 
 export interface MarginOrderParams {
     collateralToken: string
@@ -185,26 +177,26 @@ export class MarginService {
             if (!this.provider) return []
 
             // Check for WETH/USDC position
-            const positionData = await this.positionMonitor.getPositionData(userAddress, WETH_ADDRESS, USDC_ADDRESS)
+            const positionData = await this.positionMonitor.getPositionData(userAddress, WETH, USDC)
 
             if (!positionData || (parseFloat(positionData.collateralAmount) === 0 && parseFloat(positionData.debtAmount) === 0)) {
                 return []
             }
 
             // Get position health monitoring
-            const healthMonitoring = await this.positionMonitor.monitorPosition(userAddress, WETH_ADDRESS, USDC_ADDRESS)
+            const healthMonitoring = await this.positionMonitor.monitorPosition(userAddress, WETH, USDC)
 
             return [
                 {
                     id: `${userAddress}-weth-usdc`,
                     type: "long" as const, // Long WETH position with USDC debt
                     collateralToken: {
-                        address: WETH_ADDRESS,
+                        address: WETH,
                         symbol: "WETH",
                         decimals: 18,
                     },
                     debtToken: {
-                        address: USDC_ADDRESS,
+                        address: USDC,
                         symbol: "USDC",
                         decimals: 6,
                     },
